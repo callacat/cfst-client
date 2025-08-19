@@ -1,0 +1,25 @@
+# config.yml
+
+# 全局 GitHub 前置代理前缀，所有 GitHub 链接都会自动加在最前面
+proxy_prefix: "${GITHUB_PROXY}"  # 如 https://ghproxy.dsdog.tk/，不使用留空
+
+# 设备端推送到的 Gist（必须拥有写权限）
+gist:
+  token: "${GITHUB_TOKEN}"               # 环境变量注入
+  gist_id: "aaaabbbbcccc111122223333"   # 设备端写入的 Gist ID
+
+# CloudflareSpeedTest 配置
+cf:
+  binary: "/usr/local/bin/CloudflareSpeedTest"
+  args:
+    - "-ci"
+    - "ct,cu,cm"
+    - "-t"
+    - "20"
+    - "-raw"
+  output_file: "results.json"
+
+  # 自动更新配置
+  update:
+    check: true
+    api_url: "https://api.github.com/repos/XIU2/CloudflareSpeedTest/releases/latest"
