@@ -1,4 +1,4 @@
-module controller
+module cfst-client
 
 go 1.25.0
 

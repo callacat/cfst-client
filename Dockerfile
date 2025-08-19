@@ -27,7 +27,6 @@ WORKDIR /root
 # 从构建阶段复制编译好的二进制文件和配置文件
 COPY --from=builder /app/test-client /usr/local/bin/test-client
 COPY config.yml .
-
 # 设置环境变量，以便在运行时注入
 ENV GITHUB_TOKEN="" \
     GITHUB_PROXY=""
