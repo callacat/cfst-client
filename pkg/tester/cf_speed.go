@@ -4,7 +4,7 @@ import (
     "encoding/json"
     "fmt"
     "os/exec"
-    "test-client/pkg/models"
+    "cfst-client/pkg/models"
 )
 
 type CFSpeedTester struct {

@@ -5,7 +5,7 @@ import (
     "encoding/json"
     "fmt"
     "net/http"
-    "test-client/pkg/models"
+    "cfst-client/pkg/models"
 )
 
 type Client struct {

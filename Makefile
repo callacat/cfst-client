@@ -1,4 +1,4 @@
-BINARY=test-client
+BINARY=cfst-client
 
 .PHONY: build
 

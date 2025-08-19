@@ -4,10 +4,10 @@ import (
     "log"
     "os"
 
-    "test-client/pkg/config"
-    "test-client/pkg/gist"
-    "test-client/pkg/installer"
-    "test-client/pkg/tester"
+    "cfst-client/pkg/config"
+    "cfst-client/pkg/gist"
+    "cfst-client/pkg/installer"
+    "cfst-client/pkg/tester"
 )
 
 func main() {
