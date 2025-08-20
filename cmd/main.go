@@ -3,15 +3,17 @@ package main
 import (
 	"log"
 	"os"
+	"path/filepath"
 
 	"cfst-client/pkg/config"
 	"cfst-client/pkg/gist"
 	"cfst-client/pkg/installer"
 	"cfst-client/pkg/tester"
 )
-
+const configDir = "config"
 func main() {
-	cfg, err := config.Load("config.yml")
+	configPath := filepath.Join(configDir, "config.yml")
+	cfg, err := config.Load(configPath)
 	if err != nil {
 		log.Fatal("load config:", err)
 	}
@@ -27,17 +29,21 @@ func main() {
 		}
 	}
 
-	// [修改] 更新 Tester 的初始化方式
-	cf := tester.NewCFSpeedTester(cfg.CF.Binary, cfg.CF.OutputFile, cfg.DeviceName, cfg.CF.Args)
+	// [修改] 构建输出文件的完整路径
+    outputFilePath := filepath.Join(configDir, cfg.CF.OutputFile)
+
+	// [修改] 将输出文件的完整路径传递给 Tester
+	cf := tester.NewCFSpeedTester(cfg.CF.Binary, outputFilePath, cfg.DeviceName, cfg.CF.Args)
 	results, err := cf.Run()
 	if err != nil {
 		log.Fatal("speed test failed:", err)
 	}
 
 	gc := gist.NewClient(os.ExpandEnv(cfg.Gist.Token), cfg.ProxyPrefix)
+	// [修改] Gist 推送的文件名保持不变，但内容来自新的路径
 	if err := gc.PushResults(cfg.Gist.GistID, cfg.CF.OutputFile, results); err != nil {
 		log.Fatal("gist update failed:", err)
 	}
 
-	log.Println("done, pushed file:", cfg.CF.OutputFile)
+	log.Println("done, results pushed to gist. check local file at:", outputFilePath)
 }
