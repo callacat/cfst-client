@@ -1,11 +1,12 @@
 package tester
 
 import (
-	"encoding/json"
+	"encoding/csv"
 	"fmt"
+	"io"
+	"os"
 	"os/exec"
 	"strconv"
-	"strings"
 
 	"cfst-client/pkg/models"
 )
@@ -13,63 +14,81 @@ import (
 type CFSpeedTester struct {
 	bin        string
 	args       []string
-	deviceName string // [新增]
+	outputFile string // [新增]
+	deviceName string
 }
 
-// [修改] 构造函数增加 deviceName
-func NewCFSpeedTester(bin string, args []string, deviceName string) *CFSpeedTester {
-	return &CFSpeedTester{bin: bin, args: args, deviceName: deviceName}
+func NewCFSpeedTester(bin, outputFile, deviceName string, args []string) *CFSpeedTester {
+	return &CFSpeedTester{
+		bin:        bin,
+		args:       args,
+		outputFile: outputFile,
+		deviceName: deviceName,
+	}
 }
 
-// [新增] 定义一个更完整的结构来匹配 CFST 的 -json 输出
-type cfstResultItem struct {
-	IP            string  `json:"ip"`
-	Location      string  `json:"location"`
-	ISP           string  `json:"isp"`
-	AvgLatency    float64 `json:"avgLatency"`
-	Jitter        float64 `json:"jitter"`
-	PacketLoss    float64 `json:"packetLoss"`
-	DownloadSpeed float64 `json:"downloadSpeed"` // 注意：单位是 B/s
-}
-
-// [修改] Run 方法重构以解析新格式
+// [最终重构] 执行命令并解析 CSV 结果文件
 func (c *CFSpeedTester) Run() ([]models.DeviceResult, error) {
-	out, err := exec.Command(c.bin, c.args...).CombinedOutput()
+	// 将 -o 参数和文件名附加到参数列表
+	cmdArgs := append(c.args, "-o", c.outputFile)
+
+	// 执行 CloudflareSpeedTest 命令
+	cmd := exec.Command(c.bin, cmdArgs...)
+	out, err := cmd.CombinedOutput()
 	if err != nil {
-		// 检查输出是否为空，有时 CFST 即使出错也会输出一些信息
-		if len(out) == 0 {
-			return nil, fmt.Errorf("exec error: %v", err)
-		}
-		// 尝试解析可能的错误信息
 		return nil, fmt.Errorf("exec error: %v, output: %s", err, string(out))
 	}
 
-	// CFST 的 -json 输出是多行 JSON 对象，需要分割处理
-	lines := strings.Split(strings.TrimSpace(string(out)), "\n")
+	// 打开生成的 CSV 文件
+	file, err := os.Open(c.outputFile)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open result file '%s': %w", c.outputFile, err)
+	}
+	defer file.Close()
+
+	// 创建 CSV 读取器
+	reader := csv.NewReader(file)
+	// 读取 CSV 头部，并忽略
+	_, err = reader.Read()
+	if err != nil {
+		return nil, fmt.Errorf("failed to read csv header: %w", err)
+	}
+
 	var results []models.DeviceResult
 
-	for _, line := range lines {
-		var raw cfstResultItem
-		if err := json.Unmarshal([]byte(line), &raw); err != nil {
-			// 忽略无法解析的行，可能是标题或空行
-			continue
+	// 逐行读取 CSV 内容
+	for {
+		record, err := reader.Read()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return nil, fmt.Errorf("error reading csv record: %w", err)
+		}
+		if len(record) < 6 {
+			continue // 跳过格式不正确的行
 		}
 
-		// 将原始数据转换为我们的标准模型
-		res := models.DeviceResult{
-			Device:    c.deviceName, // 使用配置的设备名
-			Operator:  raw.ISP,
-			IP:        raw.IP,
-			LatencyMs: int(raw.AvgLatency),
-			JitterMs:  int(raw.Jitter),
-			LossPct:   raw.PacketLoss,
-			DLMbps:    raw.DownloadSpeed * 8 / 1e6, // B/s 转换为 Mbps
-		}
-		results = append(results, res)
+		// 解析 CSV 字段
+		// 格式: IP, 已发送, 已接收, 丢包率, 平均延迟, 下载速度(MB/s)
+		ip := record[0]
+		loss, _ := strconv.ParseFloat(record[3], 64)
+		latency, _ := strconv.ParseFloat(record[4], 64)
+		speed, _ := strconv.ParseFloat(record[5], 64)
+
+		// 填充我们的标准模型
+		results = append(results, models.DeviceResult{
+			Device:    c.deviceName,
+			Operator:  "", // CSV 中无此信息，留空或从配置中获取
+			IP:        ip,
+			LatencyMs: int(latency),
+			LossPct:   loss,
+			DLMbps:    speed * 8, // MB/s 转换为 Mbps
+		})
 	}
 
 	if len(results) == 0 {
-		return nil, fmt.Errorf("no valid results parsed from cfst output")
+		return nil, fmt.Errorf("no valid results parsed from csv file")
 	}
 
 	return results, nil

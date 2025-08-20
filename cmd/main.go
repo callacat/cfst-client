@@ -11,13 +11,11 @@ import (
 )
 
 func main() {
-	// 加载配置
 	cfg, err := config.Load("config.yml")
 	if err != nil {
 		log.Fatal("load config:", err)
 	}
 
-	// 自动更新 cf binary
 	if cfg.CF.Update.Check {
 		inst := installer.NewInstaller(
 			cfg.ProxyPrefix,
@@ -29,14 +27,13 @@ func main() {
 		}
 	}
 
-	// 测速 (传入 device_name)
-	cf := tester.NewCFSpeedTester(cfg.CF.Binary, cfg.CF.Args, cfg.DeviceName) // [修改]
+	// [修改] 更新 Tester 的初始化方式
+	cf := tester.NewCFSpeedTester(cfg.CF.Binary, cfg.CF.OutputFile, cfg.DeviceName, cfg.CF.Args)
 	results, err := cf.Run()
 	if err != nil {
 		log.Fatal("speed test failed:", err)
 	}
 
-	// 上传 Gist
 	gc := gist.NewClient(os.ExpandEnv(cfg.Gist.Token), cfg.ProxyPrefix)
 	if err := gc.PushResults(cfg.Gist.GistID, cfg.CF.OutputFile, results); err != nil {
 		log.Fatal("gist update failed:", err)

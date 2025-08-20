@@ -1,23 +1,28 @@
 # config.yml
 
-# [新增] 当前测试端设备的唯一名称
+# 当前测试端设备的唯一名称
 device_name: "my-first-client"
 
-# 全局 GitHub 前置代理前缀，所有 GitHub 链接都会自动加在最前面
-proxy_prefix: "${GITHUB_PROXY}"  # 如 https://ghproxy.com/，不使用留空
+# 全局 GitHub 前置代理前缀
+proxy_prefix: "${GITHUB_PROXY}"
 
-# 设备端推送到的 Gist（必须拥有写权限）
+# Gist 配置
 gist:
-  token: "${GITHUB_TOKEN}"               # 环境变量注入
-  gist_id: "aaaabbbbcccc111122223333"   # 设备端写入的 Gist ID
+  token: "${GITHUB_TOKEN}"
+  gist_id: "aaaabbbbcccc111122223333"
 
 # CloudflareSpeedTest 配置
 cf:
   binary: "/usr/local/bin/CloudflareSpeedTest"
-  # [修改] 优化参数以获取包含 IP、抖动、丢包的完整 JSON 输出
+  # [修改] 移除 -raw, -json 等不适用参数, 核心是 -o
+  # -o 参数由程序自动添加，无需在此配置
   args:
-    - "-json"
-  output_file: "results.json"
+    - "-dn"
+    - "20" # 下载测速数量
+    - "-t"
+    - "4"  # 延迟测速次数
+  # [修改] 输出文件名更改为 .csv
+  output_file: "result.csv"
 
   # 自动更新配置
   update:
