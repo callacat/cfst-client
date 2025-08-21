@@ -3,6 +3,13 @@
 # 当前测试端设备的唯一名称
 device_name: "my-first-client"
 
+# [核心] 当前设备所属的线路运营商 (ct, cu, cm)
+# 这个值将被用于生成上传到 Gist 的文件名
+line_operator: "cu" # 例如 "cu" 代表联通
+
+# [核心] 是否启用 IPv6 测试 (true / false)
+test_ipv6: true
+
 # 全局 GitHub 前置代理前缀
 proxy_prefix: "${GITHUB_PROXY}"
 
@@ -23,6 +30,17 @@ cf:
     - "4"  # 延迟测速次数
   # [修改] 输出文件名更改为 .csv
   output_file: "result.csv"
+
+# [核心] IPv6 测试配置 (仅在 test_ipv6: true 时启用)
+cf6:
+  binary: "/usr/local/bin/CloudflareSpeedTest"
+  args:
+    - "-dn"
+    - "10" # IPv6 可以测试少一些
+    - "-sl"
+    - "20"
+  # IPv6 本地输出的 CSV 文件名
+  output_file: "result6.csv"
 
   # 自动更新配置
   update:
