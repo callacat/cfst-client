@@ -13,7 +13,7 @@ import (
 	"cfst-client/pkg/models"
 )
 
-// ... (CFSpeedTester 结构体和 NewCFSpeedTester 函数保持不变) ...
+// CFSpeedTester holds the configuration for a speed test run.
 type CFSpeedTester struct {
 	bin        string
 	args       []string
@@ -21,6 +21,8 @@ type CFSpeedTester struct {
 	deviceName string
 }
 
+// NewCFSpeedTester creates a new instance of CFSpeedTester.
+// [CORRECTED] This function signature now matches the call in main.go.
 func NewCFSpeedTester(bin, outputFile, deviceName string, args []string) *CFSpeedTester {
 	return &CFSpeedTester{
 		bin:        bin,
@@ -30,13 +32,12 @@ func NewCFSpeedTester(bin, outputFile, deviceName string, args []string) *CFSpee
 	}
 }
 
-
+// Run executes the CloudflareSpeedTest command and parses the results.
 func (c *CFSpeedTester) Run() ([]models.DeviceResult, error) {
 	cmdArgs := append(c.args, "-o", c.outputFile)
 	fullCommand := fmt.Sprintf("%s %s", c.bin, strings.Join(cmdArgs, " "))
 	log.Printf("Executing command: %s", fullCommand)
 
-	// [修正] 恢复为简单的命令执行，移除模拟输入的逻辑
 	cmd := exec.Command(c.bin, cmdArgs...)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
@@ -47,14 +48,13 @@ func (c *CFSpeedTester) Run() ([]models.DeviceResult, error) {
 	}
 	log.Println("CloudflareSpeedTest finished successfully.")
 
-
-	// --- 后续的 CSV 解析逻辑保持不变 ---
+	// --- CSV Parsing Logic (remains the same) ---
 	file, err := os.Open(c.outputFile)
-    // ... (后续代码完全不变) ...
 	if err != nil {
 		return nil, fmt.Errorf("failed to open result file '%s': %w", c.outputFile, err)
 	}
 	defer file.Close()
+
 	reader := csv.NewReader(file)
 	_, err = reader.Read()
 	if err == io.EOF {
@@ -63,6 +63,7 @@ func (c *CFSpeedTester) Run() ([]models.DeviceResult, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to read csv header: %w", err)
 	}
+
 	var results []models.DeviceResult
 	for {
 		record, err := reader.Read()
@@ -75,10 +76,12 @@ func (c *CFSpeedTester) Run() ([]models.DeviceResult, error) {
 		if len(record) < 6 {
 			continue
 		}
+
 		ip := record[0]
 		loss, _ := strconv.ParseFloat(record[3], 64)
 		latency, _ := strconv.ParseFloat(record[4], 64)
 		speed, _ := strconv.ParseFloat(record[5], 64)
+
 		results = append(results, models.DeviceResult{
 			Device:    c.deviceName,
 			Operator:  "",
@@ -88,8 +91,10 @@ func (c *CFSpeedTester) Run() ([]models.DeviceResult, error) {
 			DLMbps:    speed * 8,
 		})
 	}
+
 	if len(results) == 0 {
 		return nil, fmt.Errorf("no valid results parsed from csv file")
 	}
+
 	return results, nil
 }
