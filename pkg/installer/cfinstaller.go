@@ -14,7 +14,7 @@ import (
 	"strings"
 )
 
-// ... ReleaseAsset 和 ReleaseInfo 结构体保持不变 ...
+// ... (ReleaseAsset 和 ReleaseInfo 结构体保持不变) ...
 type ReleaseAsset struct {
 	Name               string `json:"name"`
 	BrowserDownloadURL string `json:"browser_download_url"`
@@ -24,17 +24,14 @@ type ReleaseInfo struct {
 	Assets  []ReleaseAsset `json:"assets"`
 }
 
-
-// [修改] Installer 结构体增加 configDir 字段
 type Installer struct {
 	proxy     string
 	apiURL    string
 	binPath   string
-	configDir string // 新增：用于存放 ip.txt 等配置文件
+	configDir string
 	cacheFile string
 }
 
-// [修改] NewInstaller 构造函数增加 configDir 参数
 func NewInstaller(proxy, apiURL, binPath, configDir string) *Installer {
 	return &Installer{
 		proxy:     proxy,
@@ -45,10 +42,8 @@ func NewInstaller(proxy, apiURL, binPath, configDir string) *Installer {
 	}
 }
 
-// InstallOrUpdate 方法保持不变，但会把 configDir 传递给解压函数
+// ... (InstallOrUpdate 方法保持不变) ...
 func (i *Installer) InstallOrUpdate() error {
-    // ... 此方法前面的逻辑保持不变 ...
-
 	api := i.apiURL
 	if i.proxy != "" {
 		api = i.proxy + api
@@ -114,7 +109,6 @@ func (i *Installer) InstallOrUpdate() error {
 		return fmt.Errorf("save asset: %w", err)
 	}
 
-	// [修改] 将 configDir 传递给解压函数
 	log.Println("Unpacking archive to specified directories...")
 	if err := i.unpackTarGz(tmp); err != nil {
 		return fmt.Errorf("unpack: %w", err)
@@ -128,7 +122,8 @@ func (i *Installer) InstallOrUpdate() error {
 	return nil
 }
 
-// [核心重构] unpackTarGz 现在可以解压多个文件到不同目录
+
+// [核心修正] unpackTarGz 现在精确查找名为 'cfst' 的二进制文件
 func (i *Installer) unpackTarGz(archive string) error {
 	f, err := os.Open(archive)
 	if err != nil {
@@ -143,7 +138,6 @@ func (i *Installer) unpackTarGz(archive string) error {
 	defer gr.Close()
 
 	tr := tar.NewReader(gr)
-	// 确保目标目录存在
 	if err := os.MkdirAll(filepath.Dir(i.binPath), 0755); err != nil {
 		return err
 	}
@@ -151,7 +145,7 @@ func (i *Installer) unpackTarGz(archive string) error {
 		return err
 	}
 
-	foundFiles := 0
+	executableFound := false
 	for {
 		hdr, err := tr.Next()
 		if err == io.EOF {
@@ -167,43 +161,35 @@ func (i *Installer) unpackTarGz(archive string) error {
 		var destPath string
 		var filePerm os.FileMode
 
-		// 根据文件名判断解压路径和权限
 		switch hdr.Name {
 		case "ip.txt", "ipv6.txt":
 			destPath = filepath.Join(i.configDir, hdr.Name)
-			filePerm = 0644 // 普通文件权限
+			filePerm = 0644
 			log.Printf("Extracting '%s' to '%s'", hdr.Name, destPath)
-		case "cfst": // 假设可执行文件名是 cfst
+		// [核心修正] 我们只接受名为 "cfst" 的文件作为可执行程序
+		case "cfst":
 			destPath = i.binPath
-			filePerm = 0755 // 可执行文件权限
-			log.Printf("Extracting executable to '%s'", destPath)
+			filePerm = 0755
+			log.Printf("Extracting executable '%s' to '%s'", hdr.Name, destPath)
+			executableFound = true
 		default:
-			// 如果还有其他可执行文件名（例如 Windows 下的 cfst.exe）
-			if strings.HasPrefix(hdr.Name, "cfst") {
-				destPath = i.binPath
-				filePerm = 0755
-				log.Printf("Extracting executable '%s' to '%s'", hdr.Name, destPath)
-			} else {
-				// 忽略其他未知文件
-				continue
-			}
+			// 忽略所有其他文件，特别是那个同名的脚本
+			continue
 		}
 
 		out, err := os.OpenFile(destPath, os.O_CREATE|os.O_RDWR|os.O_TRUNC, filePerm)
 		if err != nil {
 			return err
 		}
-
 		if _, err := io.Copy(out, tr); err != nil {
 			out.Close()
 			return err
 		}
 		out.Close()
-		foundFiles++
 	}
 
-	if foundFiles == 0 {
-		return fmt.Errorf("no valid files (executable, ip.txt, ipv6.txt) found in archive")
+	if !executableFound {
+		return fmt.Errorf("executable 'cfst' not found in archive")
 	}
 
 	return nil

@@ -36,34 +36,24 @@ RUN go mod download
 COPY . .
 RUN CGO_ENABLED=0 GOOS=linux go build -o test-client ./cmd/main.go
 
+# ... (Stage 1 和 Stage 2 保持不变) ...
 
 # === Stage 3: Final Image ===
-# 这是最终的运行镜像
 FROM alpine
-
-# 安装 bash 和其他必要依赖
 RUN apk add --no-cache ca-certificates curl tar gzip bash tzdata
 ENV TZ=Asia/Shanghai
-
 WORKDIR /app
 RUN mkdir -p /app/config
 
-# --- 预置 CloudflareSpeedTest 程序 ---
-# 拷贝可执行文件
+# [核心修正] 确保这里拷贝的是名为 "cfst" 的文件
 COPY --from=downloader /download/cfst /usr/local/bin/CloudflareSpeedTest
-# 拷贝 IP 列表文件
+
+# ... (后续指令保持不变) ...
 COPY --from=downloader /download/ip.txt /app/config/ip.txt
 COPY --from=downloader /download/ipv6.txt /app/config/ipv6.txt
-
-# [核心修改]
-# 拷贝版本文件到程序期望的位置
-# Go 程序会检查 /usr/local/bin/CloudflareSpeedTest.version 文件
 COPY --from=downloader /download/version.txt /usr/local/bin/CloudflareSpeedTest.version
-
-# --- 部署我们自己的客户端程序 ---
 COPY --from=builder /app/test-client .
 
-# (后续指令保持不变)
 ENV GITHUB_TOKEN="" \
     GITHUB_PROXY=""
 ENTRYPOINT ["./test-client"]
