@@ -63,7 +63,7 @@ func runTest(gc *gist.Client, cfg *config.Config, version string) {
 	localCsvPath := filepath.Join(configDir, testConfig.OutputFile)
 
 	// [CORRECTED] This function call now matches the definition in tester.go
-	cf := tester.NewCFSpeedTest(testConfig.Binary, localCsvPath, cfg.DeviceName, finalArgs)
+	cf := tester.NewCFSpeedTester(testConfig.Binary, localCsvPath, cfg.DeviceName, finalArgs)
 	results, err := cf.Run()
 	if err != nil {
 		log.Printf("Speed test for IP%s failed: %v", version, err)
