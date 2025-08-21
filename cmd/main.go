@@ -11,7 +11,8 @@ import (
 	"cfst-client/pkg/tester"
 )
 
-const configDir = "config"
+// [修改] 使用容器内的绝对路径作为基准
+const configDir = "/app/config"
 
 func main() {
 	configPath := filepath.Join(configDir, "config.yml")
@@ -21,19 +22,17 @@ func main() {
 	}
 
 	if cfg.CF.Update.Check {
-		// [修改] 将 configDir 传递给 NewInstaller
 		inst := installer.NewInstaller(
 			cfg.ProxyPrefix,
 			cfg.CF.Update.APIURL,
 			cfg.CF.Binary,
-			configDir, // <--- 在这里传入 config 目录路径
+			configDir,
 		)
 		if err := inst.InstallOrUpdate(); err != nil {
 			log.Fatalf("install/update cf failed: %v", err)
 		}
 	}
 
-	// 后续逻辑保持不变...
 	outputFilePath := filepath.Join(configDir, cfg.CF.OutputFile)
 	cf := tester.NewCFSpeedTester(cfg.CF.Binary, outputFilePath, cfg.DeviceName, cfg.CF.Args)
 	results, err := cf.Run()
