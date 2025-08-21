@@ -54,6 +54,4 @@ COPY --from=downloader /download/ipv6.txt /app/config/ipv6.txt
 COPY --from=downloader /download/version.txt /usr/local/bin/CloudflareSpeedTest.version
 COPY --from=builder /app/test-client .
 
-ENV GITHUB_TOKEN="" \
-    GITHUB_PROXY=""
 ENTRYPOINT ["./test-client"]

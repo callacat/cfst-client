@@ -1,8 +1,10 @@
+// File: pkg/config/config.go
+
 package config
 
 import (
-	"os"
 	"gopkg.in/yaml.v2"
+	"os"
 )
 
 // CfConfig 定义了 CloudflareSpeedTest 的相关配置
@@ -12,11 +14,17 @@ type CfConfig struct {
 	OutputFile string   `yaml:"output_file"`
 }
 
+// UpdateConfig 定义了自动更新的配置
+type UpdateConfig struct {
+	Check  bool   `yaml:"check"`
+	ApiURL string `yaml:"api_url"`
+}
+
 // Config 是整个应用的配置结构
 type Config struct {
 	DeviceName   string `yaml:"device_name"`
 	LineOperator string `yaml:"line_operator"`
-	TestIPv6     bool   `yaml:"test_ipv6"` // [新增]
+	TestIPv6     bool   `yaml:"test_ipv6"`
 	ProxyPrefix  string `yaml:"proxy_prefix"`
 
 	Gist struct {
@@ -24,11 +32,12 @@ type Config struct {
 		GistID string `yaml:"gist_id"`
 	} `yaml:"gist"`
 
-	Cf  CfConfig `yaml:"cf"`  // [修改] IPv4 配置
-	Cf6 CfConfig `yaml:"cf6"` // [新增] IPv6 配置
+	Cf     CfConfig     `yaml:"cf"`
+	Cf6    CfConfig     `yaml:"cf6"`
+	Update UpdateConfig `yaml:"update"` // [新增] 更新配置
 }
 
-// Load 读取并解析配置文件，替换环境变量占位
+// Load 读取并解析配置文件
 func Load(path string) (*Config, error) {
 	b, err := os.ReadFile(path)
 	if err != nil {

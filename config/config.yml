@@ -43,6 +43,6 @@ cf6:
   output_file: "result6.csv"
 
   # 自动更新配置
-  update:
-    check: true
-    api_url: "https://api.github.com/repos/XIU2/CloudflareSpeedTest/releases/latest"
+update:
+  check: true
+  api_url: "https://api.github.com/repos/XIU2/CloudflareSpeedTest/releases/latest"

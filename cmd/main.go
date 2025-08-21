@@ -1,3 +1,5 @@
+// File: cmd/main.go
+
 package main
 
 import (
@@ -26,7 +28,20 @@ func main() {
 		log.Fatal("Error: 'device_name' and 'line_operator' in config.yml must not be empty.")
 	}
 
-	installer.NewInstaller(cfg.ProxyPrefix, "https://api.github.com/repos/XIU2/CloudflareSpeedTest/releases/latest", cfg.Cf.Binary, configDir).InstallOrUpdate()
+	// [核心] 重新启用自动更新检查
+	if cfg.Update.Check {
+		log.Println("--- Checking for CloudflareSpeedTest updates ---")
+		// 注意：这里的 binPath 使用了 IPv4 的配置，通常 v4 和 v6 使用同一个二进制文件
+		err := installer.NewInstaller(cfg.ProxyPrefix, cfg.Update.ApiURL, cfg.Cf.Binary, configDir).InstallOrUpdate()
+		if err != nil {
+			log.Printf("WARN: Failed to update CloudflareSpeedTest: %v", err)
+		} else {
+			log.Println("--- Update check finished ---")
+		}
+	} else {
+		log.Println("CloudflareSpeedTest update check is disabled in config.yml.")
+	}
+
 
 	gc := gist.NewClient(os.ExpandEnv(cfg.Gist.Token), cfg.ProxyPrefix)
 
@@ -62,7 +77,7 @@ func runTest(gc *gist.Client, cfg *config.Config, version string) {
 	finalArgs := append(testConfig.Args, "-f", ipFile)
 	localCsvPath := filepath.Join(configDir, testConfig.OutputFile)
 
-	// [CORRECTED] This function call now matches the definition in tester.go
+	// [修正] 修正函数调用错误，解决 Docker 构建失败的问题
 	cf := tester.NewCFSpeedTester(testConfig.Binary, localCsvPath, cfg.DeviceName, finalArgs)
 	results, err := cf.Run()
 	if err != nil {
