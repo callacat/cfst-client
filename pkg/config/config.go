@@ -2,7 +2,7 @@ package config
 
 import (
 	"os"
-	"gopg.in/yaml.v2"
+	"gopgk.in/yaml.v2"
 )
 
 // CfConfig 定义了 CloudflareSpeedTest 的相关配置
