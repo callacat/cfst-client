@@ -73,7 +73,7 @@ func runTest(gc *gist.Client, cfg *config.Config, version string) {
 		baseGistFilename = "results"
 	}
 
-	finalGistFilename := fmt.Sprintf("%s-%s-%s.json", baseGistFilename, cfg.LineOperator, version)
+	finalGistFilename := fmt.Sprintf("%s-%s-%s-%s.json", baseGistFilename, cfg.LineOperator, cfg.DeviceName, version)
 	finalArgs := append(testConfig.Args, "-f", ipFile)
 	localCsvPath := filepath.Join(configDir, testConfig.OutputFile)
 
