@@ -27,7 +27,20 @@ func main() {
 	if cfg.DeviceName == "" || cfg.LineOperator == "" {
 		log.Fatal("Error: 'device_name' and 'line_operator' in config.yml must not be empty.")
 	}
+	// 在 cmd/main.go 的 main 函数顶部
+	var notifiers []notifier.Notifier
 
+	if cfg.Notifications.Enabled {
+		if cfg.Notifications.PushPlus.Token != "" {
+			notifiers = append(notifiers, &notifier.PushPlusNotifier{Token: cfg.Notifications.PushPlus.Token})
+		}
+		if cfg.Notifications.Telegram.BotToken != "" {
+			notifiers = append(notifiers, &notifier.TelegramNotifier{
+				BotToken: cfg.Notifications.Telegram.BotToken,
+				ChatID:   cfg.Notifications.Telegram.ChatID,
+			})
+		}
+	}
 	// [核心] 重新启用自动更新检查
 	if cfg.Update.Check {
 		log.Println("--- Checking for CloudflareSpeedTest updates ---")
@@ -77,14 +90,62 @@ func runTest(gc *gist.Client, cfg *config.Config, version string) {
 	finalArgs := append(testConfig.Args, "-f", ipFile)
 	localCsvPath := filepath.Join(configDir, testConfig.OutputFile)
 
-	// [修正] 修正函数调用错误，解决 Docker 构建失败的问题
 	cf := tester.NewCFSpeedTester(testConfig.Binary, localCsvPath, cfg.DeviceName, finalArgs)
-	results, err := cf.Run()
-	if err != nil {
-		log.Printf("Speed test for IP%s failed: %v", version, err)
-		return
+	
+	var results []models.DeviceResult
+	var err error
+
+	// [核心] 重试逻辑
+	for i := 0; i < cfg.TestOptions.MaxRetries; i++ {
+		log.Printf("--- Starting speed test for IP%s (Attempt %d/%d) ---", version, i+1, cfg.TestOptions.MaxRetries)
+		results, err = cf.Run()
+		if err != nil {
+			log.Printf("Speed test for IP%s failed on attempt %d: %v", version, i+1, err)
+			continue // 继续下一次重试
+		}
+
+		if len(results) >= cfg.TestOptions.MinResults {
+			log.Printf("Successfully got %d results, which meets the minimum requirement of %d.", len(results), cfg.TestOptions.MinResults)
+			break // 结果符合要求，跳出循环
+		}
+
+		log.Printf("WARN: Got only %d results, which is less than the required minimum of %d. Retrying...", len(results), cfg.TestOptions.MinResults)
+		results = nil // 清空结果，准备重试
 	}
 
+	// 在 runTest 函数的结果检查部分，当最终失败时调用
+	if len(results) == 0 {
+		log.Printf("FATAL: Speed test for IP%s failed after %d attempts. No results to upload.", version, cfg.TestOptions.MaxRetries)
+		// 触发通知
+		for _, n := range notifiers {
+			title := fmt.Sprintf("Speed Test Failed on %s", cfg.DeviceName)
+			message := fmt.Sprintf("The %s speed test for IP%s failed after %d attempts.", cfg.LineOperator, version, cfg.TestOptions.MaxRetries)
+			if err := n.Notify(title, message); err != nil {
+				log.Printf("Failed to send notification: %v", err)
+			}
+		}
+		return
+	}
+	// ... 在 runTest 函数的末尾，调用 PushResults 之前
+
+	// [核心] 限制上传数量
+	var uploadResults []models.DeviceResult
+	if len(results) > cfg.TestOptions.GistUploadLimit {
+		log.Printf("Result count (%d) exceeds the limit (%d). Truncating to the top %d.", len(results), cfg.TestOptions.GistUploadLimit, cfg.TestOptions.GistUploadLimit)
+		uploadResults = results[:cfg.TestOptions.GistUploadLimit]
+	} else {
+		uploadResults = results
+	}
+
+	log.Printf("Uploading %d results to Gist as JSON with filename: %s", len(uploadResults), finalGistFilename)
+	// 使用 uploadResults 进行上传
+	if err := gc.PushResults(cfg.Gist.GistID, finalGistFilename, uploadResults); err != nil {
+		if strings.Contains(err.Error(), "404") {
+			log.Printf("FATAL: Gist update for %s failed with 404 Not Found. Please check Gist ID and GITHUB_TOKEN permissions.", finalGistFilename)
+		}
+		log.Printf("Gist update for %s failed: %v", finalGistFilename, err)
+		return
+	}
 	log.Printf("Uploading results to Gist as JSON with filename: %s", finalGistFilename)
 	if err := gc.PushResults(cfg.Gist.GistID, finalGistFilename, results); err != nil {
 		if strings.Contains(err.Error(), "404") {

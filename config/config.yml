@@ -18,6 +18,15 @@ gist:
   token: "${GITHUB_TOKEN}"
   gist_id: "aaaabbbbcccc111122223333"
 
+# [新增] 测速任务配置
+test_options:
+  # 结果数量下限，低于此值则触发重试
+  min_results: 5
+  # 最大重试次数
+  max_retries: 3
+  # 上传到 Gist 的最大 IP 数量
+  gist_upload_limit: 10
+
 # CloudflareSpeedTest 配置
 cf:
   binary: "/usr/local/bin/CloudflareSpeedTest"
@@ -46,3 +55,12 @@ cf6:
 update:
   check: true
   api_url: "https://api.github.com/repos/XIU2/CloudflareSpeedTest/releases/latest"
+
+# [新增] 通知配置
+notifications:
+  enabled: true
+  pushplus:
+    token: "your_pushplus_token"
+  telegram:
+    bot_token: "your_bot_token"
+    chat_id: "your_chat_id"

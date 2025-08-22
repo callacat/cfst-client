@@ -32,9 +32,15 @@ type Config struct {
 		GistID string `yaml:"gist_id"`
 	} `yaml:"gist"`
 
-	Cf     CfConfig     `yaml:"cf"`
-	Cf6    CfConfig     `yaml:"cf6"`
-	Update UpdateConfig `yaml:"update"` // [新增] 更新配置
+	TestOptions struct {
+        MinResults      int `yaml:"min_results"`
+        MaxRetries      int `yaml:"max_retries"`
+        GistUploadLimit int `yaml:"gist_upload_limit"`
+    } `yaml:"test_options"`
+
+    Cf     CfConfig     `yaml:"cf"`
+    Cf6    CfConfig     `yaml:"cf6"`
+    Update UpdateConfig `yaml:"update"`
 }
 
 // Load 读取并解析配置文件
@@ -50,4 +56,18 @@ func Load(path string) (*Config, error) {
 	cfg.ProxyPrefix = os.ExpandEnv(cfg.ProxyPrefix)
 	cfg.Gist.Token = os.ExpandEnv(cfg.Gist.Token)
 	return &cfg, nil
+}
+
+type Config struct {
+    // ...
+    Notifications struct {
+        Enabled  bool `yaml:"enabled"`
+        PushPlus struct {
+            Token string `yaml:"token"`
+        } `yaml:"pushplus"`
+        Telegram struct {
+            BotToken string `yaml:"bot_token"`
+            ChatID   string `yaml:"chat_id"`
+        } `yaml:"telegram"`
+    } `yaml:"notifications"`
 }

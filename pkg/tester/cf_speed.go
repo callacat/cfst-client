@@ -84,7 +84,6 @@ func (c *CFSpeedTester) Run() ([]models.DeviceResult, error) {
 
 		results = append(results, models.DeviceResult{
 			Device:    c.deviceName,
-			Operator:  "",
 			IP:        ip,
 			LatencyMs: int(latency),
 			LossPct:   loss,
