@@ -87,7 +87,7 @@ func (c *CFSpeedTester) Run() ([]models.DeviceResult, error) {
 			IP:        ip,
 			LatencyMs: int(latency),
 			LossPct:   loss,
-			DLMbps:    speed * 8,
+			DLMBps:    speed, // [FIX] Remove * 8 conversion
 		})
 	}
 

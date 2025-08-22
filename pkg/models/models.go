@@ -6,5 +6,5 @@ type DeviceResult struct {
 	IP        string  `json:"ip"`
 	LatencyMs int     `json:"latency_ms"`
 	LossPct   float64 `json:"loss_pct"` // [新增] 从 CSV 获取
-	DLMbps    float64 `json:"dl_mbps"`
+	DLMBps    float64 `json:"dl_mbps"`    // [FIX] Renamed field to reflect MB/s unit
 }
