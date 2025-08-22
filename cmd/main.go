@@ -12,7 +12,7 @@ import (
 	"cfst-client/pkg/config"
 	"cfst-client/pkg/gist"
 	"cfst-client/pkg/installer"
-	"cfst-client/pkg/models" // [FIX] Added missing import
+	"cfst-client/pkg/models"
 	"cfst-client/pkg/notifier"
 	"cfst-client/pkg/tester"
 )
@@ -30,7 +30,6 @@ func main() {
 		log.Fatal("Error: 'device_name' and 'line_operator' in config.yml must not be empty.")
 	}
 
-	// [核心修改] 初始化通知器列表
 	var notifiers []notifier.Notifier
 	if cfg.Notifications.Enabled {
 		if cfg.Notifications.PushPlus.Token != "" {
@@ -46,10 +45,8 @@ func main() {
 		}
 	}
 
-	// [核心] 重新启用自动更新检查
 	if cfg.Update.Check {
 		log.Println("--- Checking for CloudflareSpeedTest updates ---")
-		// 注意：这里的 binPath 使用了 IPv4 的配置，通常 v4 和 v6 使用同一个二进制文件
 		err := installer.NewInstaller(cfg.ProxyPrefix, cfg.Update.ApiURL, cfg.Cf.Binary, configDir).InstallOrUpdate()
 		if err != nil {
 			log.Printf("WARN: Failed to update CloudflareSpeedTest: %v", err)
@@ -63,11 +60,11 @@ func main() {
 	gc := gist.NewClient(os.ExpandEnv(cfg.Gist.Token), cfg.ProxyPrefix)
 
 	log.Println("--- Starting test for IPv4 ---")
-	runTest(gc, cfg, "v4", notifiers) // [修改] 传入 notifiers
+	runTest(gc, cfg, "v4", notifiers)
 
 	if cfg.TestIPv6 {
 		log.Println("--- Starting test for IPv6 ---")
-		runTest(gc, cfg, "v6", notifiers) // [修改] 传入 notifiers
+		runTest(gc, cfg, "v6", notifiers)
 	} else {
 		log.Println("IPv6 test is disabled in config.yml, skipping.")
 	}
@@ -75,7 +72,6 @@ func main() {
 	log.Println("All tests done.")
 }
 
-// [FIX] Corrected function signature to accept notifiers
 func runTest(gc *gist.Client, cfg *config.Config, version string, notifiers []notifier.Notifier) {
 	var testConfig config.CfConfig
 	var ipFile string
@@ -95,33 +91,31 @@ func runTest(gc *gist.Client, cfg *config.Config, version string, notifiers []no
 	finalArgs := append(testConfig.Args, "-f", ipFile)
 	localCsvPath := filepath.Join(configDir, testConfig.OutputFile)
 
-	cf := tester.NewCFSpeedTester(testConfig.Binary, localCsvPath, cfg.DeviceName, finalArgs)
+	// [FIX] Pass cfg.LineOperator as the fourth argument to the speed tester
+	cf := tester.NewCFSpeedTester(testConfig.Binary, localCsvPath, cfg.DeviceName, cfg.LineOperator, finalArgs)
 
 	var results []models.DeviceResult
 	var err error
 
-	// [核心] 重试逻辑
 	for i := 0; i < cfg.TestOptions.MaxRetries; i++ {
 		log.Printf("--- Starting speed test for IP%s (Attempt %d/%d) ---", version, i+1, cfg.TestOptions.MaxRetries)
 		results, err = cf.Run()
 		if err != nil {
 			log.Printf("Speed test for IP%s failed on attempt %d: %v", version, i+1, err)
-			continue // 继续下一次重试
+			continue
 		}
 
 		if len(results) >= cfg.TestOptions.MinResults {
 			log.Printf("Successfully got %d results, which meets the minimum requirement of %d.", len(results), cfg.TestOptions.MinResults)
-			break // 结果符合要求，跳出循环
+			break
 		}
 
 		log.Printf("WARN: Got only %d results, which is less than the required minimum of %d. Retrying...", len(results), cfg.TestOptions.MinResults)
-		results = nil // 清空结果，准备重试
+		results = nil
 	}
 
-	// 在 runTest 函数的结果检查部分，当最终失败时调用
 	if len(results) == 0 {
 		log.Printf("FATAL: Speed test for IP%s failed after %d attempts. No results to upload.", version, cfg.TestOptions.MaxRetries)
-		// [修改] 触发通知
 		title := fmt.Sprintf("Speed Test Failed on %s", cfg.DeviceName)
 		message := fmt.Sprintf("The %s speed test for IP%s failed after %d attempts.", cfg.LineOperator, version, cfg.TestOptions.MaxRetries)
 		for _, n := range notifiers {
@@ -132,7 +126,6 @@ func runTest(gc *gist.Client, cfg *config.Config, version string, notifiers []no
 		return
 	}
 
-	// [核心] 限制上传数量
 	var uploadResults []models.DeviceResult
 	if len(results) > cfg.TestOptions.GistUploadLimit {
 		log.Printf("Result count (%d) exceeds the limit (%d). Truncating to the top %d.", len(results), cfg.TestOptions.GistUploadLimit, cfg.TestOptions.GistUploadLimit)
@@ -142,7 +135,6 @@ func runTest(gc *gist.Client, cfg *config.Config, version string, notifiers []no
 	}
 
 	log.Printf("Uploading %d results to Gist as JSON with filename: %s", len(uploadResults), finalGistFilename)
-	// 使用 uploadResults 进行上传
 	if err := gc.PushResults(cfg.Gist.GistID, finalGistFilename, uploadResults); err != nil {
 		if strings.Contains(err.Error(), "404") {
 			log.Printf("FATAL: Gist update for %s failed with 404 Not Found. Please check Gist ID and GITHUB_TOKEN permissions.", finalGistFilename)
