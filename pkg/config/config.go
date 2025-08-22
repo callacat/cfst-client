@@ -7,24 +7,44 @@ import (
 	"os"
 )
 
-// CfConfig 定义了 CloudflareSpeedTest 的相关配置
+// ... CfConfig, UpdateConfig, TestOptions 结构体保持不变 ...
 type CfConfig struct {
 	Binary     string   `yaml:"binary"`
 	Args       []string `yaml:"args"`
 	OutputFile string   `yaml:"output_file"`
 }
 
-// UpdateConfig 定义了自动更新的配置
 type UpdateConfig struct {
 	Check  bool   `yaml:"check"`
 	ApiURL string `yaml:"api_url"`
 }
 
-// TestOptions 定义了测试相关的选项
 type TestOptions struct {
 	MinResults      int `yaml:"min_results"`
 	MaxRetries      int `yaml:"max_retries"`
 	GistUploadLimit int `yaml:"gist_upload_limit"`
+}
+
+// [核心修改] 新增 TelegramProxyConfig 结构体
+type TelegramProxyConfig struct {
+	Enabled bool   `yaml:"enabled"`
+	Type    string `yaml:"type"`
+	Address string `yaml:"address"`
+	ApiURL  string `yaml:"api_url"`
+}
+
+type TelegramConfig struct {
+	BotToken string              `yaml:"bot_token"`
+	ChatID   string              `yaml:"chat_id"`
+	Proxy    TelegramProxyConfig `yaml:"proxy"`
+}
+
+type NotificationsConfig struct {
+	Enabled  bool           `yaml:"enabled"`
+	PushPlus struct {
+		Token string `yaml:"token"`
+	} `yaml:"pushplus"`
+	Telegram TelegramConfig `yaml:"telegram"`
 }
 
 // Config 是整个应用的配置结构
@@ -38,12 +58,12 @@ type Config struct {
 		Token  string `yaml:"token"`
 		GistID string `yaml:"gist_id"`
 	} `yaml:"gist"`
-
-    // [核心修正] 包含了所有新旧字段的唯一 Config 定义
-	TestOptions TestOptions  `yaml:"test_options"`
-	Cf          CfConfig     `yaml:"cf"`
-	Cf6         CfConfig     `yaml:"cf6"`
-	Update      UpdateConfig `yaml:"update"`
+	
+	Notifications NotificationsConfig `yaml:"notifications"` // [修改]
+	TestOptions   TestOptions         `yaml:"test_options"`
+	Cf            CfConfig            `yaml:"cf"`
+	Cf6           CfConfig            `yaml:"cf6"`
+	Update        UpdateConfig        `yaml:"update"`
 }
 
 // Load 读取并解析配置文件
@@ -56,8 +76,12 @@ func Load(path string) (*Config, error) {
 	if err := yaml.Unmarshal(b, &cfg); err != nil {
 		return nil, err
 	}
-	// 在这里展开环境变量
+	
+	// 展开所有需要使用环境变量的字段
 	cfg.ProxyPrefix = os.ExpandEnv(cfg.ProxyPrefix)
 	cfg.Gist.Token = os.ExpandEnv(cfg.Gist.Token)
+	cfg.Notifications.Telegram.BotToken = os.ExpandEnv(cfg.Notifications.Telegram.BotToken)
+	cfg.Notifications.Telegram.ChatID = os.ExpandEnv(cfg.Notifications.Telegram.ChatID)
+
 	return &cfg, nil
 }

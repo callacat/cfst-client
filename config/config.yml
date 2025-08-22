@@ -60,7 +60,20 @@ update:
 notifications:
   enabled: true
   pushplus:
-    token: "your_pushplus_token"
+    token: "" # your_pushplus_token
   telegram:
-    bot_token: "your_bot_token"
-    chat_id: "your_chat_id"
+    bot_token: "${TELEGRAM_BOT_TOKEN}" # your_bot_token
+    chat_id: "${TELEGRAM_CHAT_ID}"     # your_chat_id
+    
+    # [核心修改] Telegram 代理配置
+    proxy:
+      enabled: false # 是否为 Telegram 启用代理
+      # 代理类型: "socks5" 或 "reverse_proxy"
+      type: "socks5" 
+      # SOCKS5 代理地址 (仅当 type 为 "socks5" 时有效)
+      # 例如: "127.0.0.1:1080"
+      address: "127.0.0.1:1080"
+      # 反向代理 API 地址 (仅当 type 为 "reverse_proxy" 时有效)
+      # 替换 "https://api.telegram.org"
+      # 例如: "https://my.proxy.com"
+      api_url: ""
