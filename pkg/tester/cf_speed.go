@@ -35,8 +35,6 @@ func NewCFSpeedTester(bin, outputFile, deviceName, lineOperator string, args []s
 
 // Run executes the CloudflareSpeedTest command and parses the results.
 func (c *CFSpeedTester) Run() ([]models.DeviceResult, error) {
-	// [FIX] Delete the old result file before starting a new test
-	// This ensures that we are only parsing the results from the current run.
 	_ = os.Remove(c.outputFile)
 
 	cmdArgs := append(c.args, "-o", c.outputFile)
@@ -53,7 +51,6 @@ func (c *CFSpeedTester) Run() ([]models.DeviceResult, error) {
 	}
 	log.Println("CloudflareSpeedTest finished successfully.")
 
-	// --- CSV Parsing Logic (remains the same) ---
 	file, err := os.Open(c.outputFile)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open result file '%s': %w", c.outputFile, err)
@@ -78,7 +75,8 @@ func (c *CFSpeedTester) Run() ([]models.DeviceResult, error) {
 		if err != nil {
 			return nil, fmt.Errorf("error reading csv record: %w", err)
 		}
-		if len(record) < 6 {
+		// [修改] 现在要求至少有 7 列数据
+		if len(record) < 7 {
 			continue
 		}
 
@@ -86,6 +84,7 @@ func (c *CFSpeedTester) Run() ([]models.DeviceResult, error) {
 		loss, _ := strconv.ParseFloat(record[3], 64)
 		latency, _ := strconv.ParseFloat(record[4], 64)
 		speed, _ := strconv.ParseFloat(record[5], 64)
+		region := record[6] // [新增] 获取地区码
 
 		results = append(results, models.DeviceResult{
 			Device:    c.deviceName,
@@ -94,6 +93,7 @@ func (c *CFSpeedTester) Run() ([]models.DeviceResult, error) {
 			LatencyMs: int(latency),
 			LossPct:   loss,
 			DLMBps:    speed,
+			Region:    region, // [新增] 填充地区码字段
 		})
 	}
 

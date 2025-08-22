@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time" // [新增] 引入 time 包
 
 	"cfst-client/pkg/config"
 	"cfst-client/pkg/gist"
@@ -91,7 +92,6 @@ func runTest(gc *gist.Client, cfg *config.Config, version string, notifiers []no
 	finalArgs := append(testConfig.Args, "-f", ipFile)
 	localCsvPath := filepath.Join(configDir, testConfig.OutputFile)
 
-	// [FIX] Pass cfg.LineOperator as the fourth argument to the speed tester
 	cf := tester.NewCFSpeedTester(testConfig.Binary, localCsvPath, cfg.DeviceName, cfg.LineOperator, finalArgs)
 
 	var results []models.DeviceResult
@@ -134,8 +134,15 @@ func runTest(gc *gist.Client, cfg *config.Config, version string, notifiers []no
 		uploadResults = results
 	}
 
+	// [新增] 创建包含时间戳和结果的 GistContent 对象
+	gistContent := models.GistContent{
+		Timestamp: time.Now().Format(time.RFC3339),
+		Results:   uploadResults,
+	}
+
 	log.Printf("Uploading %d results to Gist as JSON with filename: %s", len(uploadResults), finalGistFilename)
-	if err := gc.PushResults(cfg.Gist.GistID, finalGistFilename, uploadResults); err != nil {
+	// [修改] 传递 gistContent 对象进行上传
+	if err := gc.PushResults(cfg.Gist.GistID, finalGistFilename, gistContent); err != nil {
 		if strings.Contains(err.Error(), "404") {
 			log.Printf("FATAL: Gist update for %s failed with 404 Not Found. Please check Gist ID and GITHUB_TOKEN permissions.", finalGistFilename)
 		}
