@@ -32,7 +32,8 @@ FROM golang:1.25-alpine AS builder
 
 WORKDIR /app
 COPY go.mod go.sum ./
-RUN go mod download
+RUN go mod download /
+    && go get golang.org/x/net
 COPY . .
 RUN CGO_ENABLED=0 GOOS=linux go build -o test-client ./cmd/main.go
 
@@ -40,7 +41,7 @@ RUN CGO_ENABLED=0 GOOS=linux go build -o test-client ./cmd/main.go
 
 # === Stage 3: Final Image ===
 FROM alpine
-RUN apk add --no-cache ca-certificates curl tar gzip bash tzdata
+RUN apk add --no-cache ca-certificates curl tar gzip bash tzdata 
 ENV TZ=Asia/Shanghai
 WORKDIR /app
 RUN mkdir -p /app/config
