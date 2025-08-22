@@ -12,8 +12,9 @@ import (
 	"cfst-client/pkg/config"
 	"cfst-client/pkg/gist"
 	"cfst-client/pkg/installer"
+	"cfst-client/pkg/models" // [FIX] Added missing import
+	"cfst-client/pkg/notifier"
 	"cfst-client/pkg/tester"
-	"cfst-client/pkg/notifier" // [新增]
 )
 
 const configDir = "/app/config"
@@ -59,7 +60,6 @@ func main() {
 		log.Println("CloudflareSpeedTest update check is disabled in config.yml.")
 	}
 
-
 	gc := gist.NewClient(os.ExpandEnv(cfg.Gist.Token), cfg.ProxyPrefix)
 
 	log.Println("--- Starting test for IPv4 ---")
@@ -75,7 +75,8 @@ func main() {
 	log.Println("All tests done.")
 }
 
-func runTest(gc *gist.Client, cfg *config.Config, version string) {
+// [FIX] Corrected function signature to accept notifiers
+func runTest(gc *gist.Client, cfg *config.Config, version string, notifiers []notifier.Notifier) {
 	var testConfig config.CfConfig
 	var ipFile string
 	var baseGistFilename string
@@ -95,7 +96,7 @@ func runTest(gc *gist.Client, cfg *config.Config, version string) {
 	localCsvPath := filepath.Join(configDir, testConfig.OutputFile)
 
 	cf := tester.NewCFSpeedTester(testConfig.Binary, localCsvPath, cfg.DeviceName, finalArgs)
-	
+
 	var results []models.DeviceResult
 	var err error
 
