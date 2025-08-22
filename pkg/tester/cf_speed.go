@@ -15,25 +15,30 @@ import (
 
 // CFSpeedTester holds the configuration for a speed test run.
 type CFSpeedTester struct {
-	bin        string
-	args       []string
-	outputFile string
-	deviceName string
+	bin          string
+	args         []string
+	outputFile   string
+	deviceName   string
+	lineOperator string
 }
 
 // NewCFSpeedTester creates a new instance of CFSpeedTester.
-// [CORRECTED] This function signature now matches the call in main.go.
-func NewCFSpeedTester(bin, outputFile, deviceName string, args []string) *CFSpeedTester {
+func NewCFSpeedTester(bin, outputFile, deviceName, lineOperator string, args []string) *CFSpeedTester {
 	return &CFSpeedTester{
-		bin:        bin,
-		args:       args,
-		outputFile: outputFile,
-		deviceName: deviceName,
+		bin:          bin,
+		args:         args,
+		outputFile:   outputFile,
+		deviceName:   deviceName,
+		lineOperator: lineOperator,
 	}
 }
 
 // Run executes the CloudflareSpeedTest command and parses the results.
 func (c *CFSpeedTester) Run() ([]models.DeviceResult, error) {
+	// [FIX] Delete the old result file before starting a new test
+	// This ensures that we are only parsing the results from the current run.
+	_ = os.Remove(c.outputFile)
+
 	cmdArgs := append(c.args, "-o", c.outputFile)
 	fullCommand := fmt.Sprintf("%s %s", c.bin, strings.Join(cmdArgs, " "))
 	log.Printf("Executing command: %s", fullCommand)
@@ -84,10 +89,11 @@ func (c *CFSpeedTester) Run() ([]models.DeviceResult, error) {
 
 		results = append(results, models.DeviceResult{
 			Device:    c.deviceName,
+			Operator:  c.lineOperator,
 			IP:        ip,
 			LatencyMs: int(latency),
 			LossPct:   loss,
-			DLMBps:    speed, // [FIX] Remove * 8 conversion
+			DLMBps:    speed,
 		})
 	}
 
