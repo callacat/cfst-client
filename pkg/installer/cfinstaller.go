@@ -11,10 +11,10 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
-	"strings"
+	"strings" // [FIX] Import the strings package
 )
 
-// ... (ReleaseAsset 和 ReleaseInfo 结构体保持不变) ...
+// ... (ReleaseAsset and ReleaseInfo structs remain the same) ...
 type ReleaseAsset struct {
 	Name               string `json:"name"`
 	BrowserDownloadURL string `json:"browser_download_url"`
@@ -42,7 +42,6 @@ func NewInstaller(proxy, apiURL, binPath, configDir string) *Installer {
 	}
 }
 
-// ... (InstallOrUpdate 方法保持不变) ...
 func (i *Installer) InstallOrUpdate() error {
 	api := i.apiURL
 	if i.proxy != "" {
@@ -59,11 +58,12 @@ func (i *Installer) InstallOrUpdate() error {
 		return fmt.Errorf("decode release: %w", err)
 	}
 
-	if data, err := os.ReadFile(i.cacheFile); err == nil && string(data) == info.TagName {
+	// [FIX] Trim whitespace from the cached version string before comparing
+	if data, err := os.ReadFile(i.cacheFile); err == nil && strings.TrimSpace(string(data)) == info.TagName {
 		log.Println("CloudflareSpeedTest is already the latest version:", info.TagName)
 		return nil
 	}
-	
+
 	log.Println("New CloudflareSpeedTest version found:", info.TagName)
 
 	targetFilename := fmt.Sprintf("cfst_%s_%s.tar.gz", runtime.GOOS, runtime.GOARCH)
@@ -87,7 +87,7 @@ func (i *Installer) InstallOrUpdate() error {
 	if i.proxy != "" {
 		dlURL = i.proxy + assetURL
 	}
-	
+
 	log.Println("Downloading from:", dlURL)
 
 	tmp := filepath.Join(os.TempDir(), targetFilename)
@@ -95,7 +95,7 @@ func (i *Installer) InstallOrUpdate() error {
 	if err != nil {
 		return err
 	}
-	
+
 	resp2, err := http.Get(dlURL)
 	if err != nil {
 		out.Close()
@@ -122,8 +122,7 @@ func (i *Installer) InstallOrUpdate() error {
 	return nil
 }
 
-
-// [核心修正] unpackTarGz 现在精确查找名为 'cfst' 的二进制文件
+// ... (unpackTarGz function remains the same) ...
 func (i *Installer) unpackTarGz(archive string) error {
 	f, err := os.Open(archive)
 	if err != nil {
