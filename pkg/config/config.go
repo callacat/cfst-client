@@ -20,6 +20,13 @@ type UpdateConfig struct {
 	ApiURL string `yaml:"api_url"`
 }
 
+// TestOptions 定义了测试相关的选项
+type TestOptions struct {
+	MinResults      int `yaml:"min_results"`
+	MaxRetries      int `yaml:"max_retries"`
+	GistUploadLimit int `yaml:"gist_upload_limit"`
+}
+
 // Config 是整个应用的配置结构
 type Config struct {
 	DeviceName   string `yaml:"device_name"`
@@ -32,15 +39,11 @@ type Config struct {
 		GistID string `yaml:"gist_id"`
 	} `yaml:"gist"`
 
-	TestOptions struct {
-        MinResults      int `yaml:"min_results"`
-        MaxRetries      int `yaml:"max_retries"`
-        GistUploadLimit int `yaml:"gist_upload_limit"`
-    } `yaml:"test_options"`
-
-    Cf     CfConfig     `yaml:"cf"`
-    Cf6    CfConfig     `yaml:"cf6"`
-    Update UpdateConfig `yaml:"update"`
+    // [核心修正] 包含了所有新旧字段的唯一 Config 定义
+	TestOptions TestOptions  `yaml:"test_options"`
+	Cf          CfConfig     `yaml:"cf"`
+	Cf6         CfConfig     `yaml:"cf6"`
+	Update      UpdateConfig `yaml:"update"`
 }
 
 // Load 读取并解析配置文件
@@ -53,21 +56,8 @@ func Load(path string) (*Config, error) {
 	if err := yaml.Unmarshal(b, &cfg); err != nil {
 		return nil, err
 	}
+	// 在这里展开环境变量
 	cfg.ProxyPrefix = os.ExpandEnv(cfg.ProxyPrefix)
 	cfg.Gist.Token = os.ExpandEnv(cfg.Gist.Token)
 	return &cfg, nil
-}
-
-type Config struct {
-    // ...
-    Notifications struct {
-        Enabled  bool `yaml:"enabled"`
-        PushPlus struct {
-            Token string `yaml:"token"`
-        } `yaml:"pushplus"`
-        Telegram struct {
-            BotToken string `yaml:"bot_token"`
-            ChatID   string `yaml:"chat_id"`
-        } `yaml:"telegram"`
-    } `yaml:"notifications"`
 }
