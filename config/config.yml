@@ -26,6 +26,10 @@ test_options:
   max_retries: 3
   # 上传到 Gist 的最大 IP 数量
   gist_upload_limit: 10
+  # [新增] 重试策略:
+  # "single":     单次测试结果满足 min_results 即可，程序将立即停止重试并上传当次结果。
+  # "accumulate": (默认)会执行完所有重试次数，累积所有结果，并从中筛选最优的结果上传。
+  retry_strategy: "accumulate"
 
 # CloudflareSpeedTest 配置
 cf:
