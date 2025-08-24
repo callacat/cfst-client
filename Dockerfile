@@ -44,14 +44,19 @@ RUN apk add --no-cache ca-certificates curl tar gzip bash tzdata
 ENV TZ=Asia/Shanghai
 WORKDIR /app
 RUN mkdir -p /app/config
+RUN mkdir -p /app/default_config
 
 # [核心修正] 确保这里拷贝的是名为 "cfst" 的文件
 COPY --from=downloader /download/cfst /usr/local/bin/CloudflareSpeedTest
 
 # ... (后续指令保持不变) ...
-COPY --from=downloader /download/ip.txt /app/config/ip.txt
-COPY --from=downloader /download/ipv6.txt /app/config/ipv6.txt
+COPY --from=downloader /download/ip.txt /app/default_config/ip.txt
+COPY --from=downloader /download/ipv6.txt /app/default_config/ipv6.txt
 COPY --from=downloader /download/version.txt /usr/local/bin/CloudflareSpeedTest.version
 COPY --from=builder /app/test-client .
 
-ENTRYPOINT ["./test-client"]
+COPY config.yml /app/default_config/config.yml
+COPY entrypoint.sh /app/entrypoint.sh
+RUN chmod +x /app/entrypoint.sh
+
+ENTRYPOINT ["/app/entrypoint.sh"]
