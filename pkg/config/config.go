@@ -53,13 +53,14 @@ type Config struct {
 	LineOperator string `yaml:"line_operator"`
 	TestIPv6     bool   `yaml:"test_ipv6"`
 	ProxyPrefix  string `yaml:"proxy_prefix"`
+	Cron         string `yaml:"cron"` // 新增 Cron 字段
 
 	Gist struct {
 		Token  string `yaml:"token"`
 		GistID string `yaml:"gist_id"`
 	} `yaml:"gist"`
 	
-	Notifications NotificationsConfig `yaml:"notifications"` // [修改]
+	Notifications NotificationsConfig `yaml:"notifications"`
 	TestOptions   TestOptions         `yaml:"test_options"`
 	Cf            CfConfig            `yaml:"cf"`
 	Cf6           CfConfig            `yaml:"cf6"`

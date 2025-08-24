@@ -7,7 +7,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
-	"sort" // [新增] 引入 sort 包
+	"sort"
 	"strings"
 	"time"
 
@@ -17,12 +17,12 @@ import (
 	"cfst-client/pkg/models"
 	"cfst-client/pkg/notifier"
 	"cfst-client/pkg/tester"
+	"github.com/robfig/cron/v3"
 )
 
 const configDir = "/app/config"
 
 func main() {
-	// ... (main function remains unchanged) ...
 	configPath := filepath.Join(configDir, "config.yml")
 	cfg, err := config.Load(configPath)
 	if err != nil {
@@ -33,6 +33,29 @@ func main() {
 		log.Fatal("Error: 'device_name' and 'line_operator' in config.yml must not be empty.")
 	}
 
+	// 立即执行一次测试
+	runAllTests(cfg)
+
+	// 如果配置了 cron 表达式，则启动定时任务
+	if cfg.Cron != "" {
+		log.Printf("Scheduling tests with cron expression: %s", cfg.Cron)
+		c := cron.New()
+		_, err := c.AddFunc(cfg.Cron, func() {
+			runAllTests(cfg)
+		})
+		if err != nil {
+			log.Fatalf("Error adding cron job: %v", err)
+		}
+		c.Start()
+
+		// 保持主 goroutine 运行
+		select {}
+	}
+}
+
+func runAllTests(cfg *config.Config) {
+	log.Println("--- Starting all tests ---")
+	
 	var notifiers []notifier.Notifier
 	if cfg.Notifications.Enabled {
 		if cfg.Notifications.PushPlus.Token != "" {
@@ -72,8 +95,10 @@ func main() {
 		log.Println("IPv6 test is disabled in config.yml, skipping.")
 	}
 
-	log.Println("All tests done.")
+	log.Println("--- All tests done ---")
 }
+
+// ... (runTest 函数保持不变) ...
 
 func runTest(gc *gist.Client, cfg *config.Config, version string, notifiers []notifier.Notifier) {
 	var testConfig config.CfConfig
