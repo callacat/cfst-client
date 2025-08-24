@@ -23,7 +23,6 @@ type TestOptions struct {
 	MinResults      int    `yaml:"min_results"`
 	MaxRetries      int    `yaml:"max_retries"`
 	GistUploadLimit int    `yaml:"gist_upload_limit"`
-	RetryStrategy   string `yaml:"retry_strategy"` // [新增] single 或 accumulate
 }
 
 // [核心修改] 新增 TelegramProxyConfig 结构体

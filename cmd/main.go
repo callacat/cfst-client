@@ -106,16 +106,11 @@ func runTest(gc *gist.Client, cfg *config.Config, version string, notifiers []no
 			log.Printf("Speed test for IP%s failed on attempt %d: %v", version, i+1, err)
 		} else if len(currentResults) > 0 {
 			log.Printf("Got %d results in this attempt.", len(currentResults))
-			if cfg.TestOptions.RetryStrategy == "accumulate" {
-				finalResults = append(finalResults, currentResults...)
-			} else { // "single" mode
-				finalResults = currentResults
-			}
+			finalResults = currentResults
 		}
 
-		// 在 "single" 模式下，只要满足条件就立即退出
-		if cfg.TestOptions.RetryStrategy != "accumulate" && len(finalResults) >= cfg.TestOptions.MinResults {
-			log.Printf("Got enough results (%d) in 'single' mode. Proceeding to upload.", len(finalResults))
+		if len(finalResults) >= cfg.TestOptions.MinResults {
+			log.Printf("Got enough results (%d). Proceeding to upload.", len(finalResults))
 			break
 		}
 
