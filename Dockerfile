@@ -36,8 +36,6 @@ RUN go mod download
 COPY . .
 RUN CGO_ENABLED=0 GOOS=linux go build -o test-client ./cmd/main.go
 
-# ... (Stage 1 和 Stage 2 保持不变) ...
-
 # === Stage 3: Final Image ===
 FROM alpine
 RUN apk add --no-cache ca-certificates curl tar gzip bash tzdata 
@@ -55,7 +53,8 @@ COPY --from=downloader /download/ipv6.txt /app/default_config/ipv6.txt
 COPY --from=downloader /download/version.txt /usr/local/bin/CloudflareSpeedTest.version
 COPY --from=builder /app/test-client .
 
-COPY config.yml /app/default_config/config.yml
+# [已修正] 从正确的 config 目录复制 config.yml
+COPY config/config.yml /app/default_config/config.yml
 COPY entrypoint.sh /app/entrypoint.sh
 RUN chmod +x /app/entrypoint.sh
 
