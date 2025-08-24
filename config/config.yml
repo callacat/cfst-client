@@ -1,5 +1,9 @@
 # config.yml
 
+# [新增] Cron 表达式，用于定时执行测速任务
+# 留空表示只在启动时执行一次
+cron: "0 0 * * *" # 例如 "0 0 * * *" 表示每天午夜执行一次
+
 # 当前测试端设备的唯一名称
 device_name: "my-first-client"
 
@@ -18,7 +22,7 @@ gist:
   token: "${GITHUB_TOKEN}"
   gist_id: "aaaabbbbcccc111122223333"
 
-# [新增] 测速任务配置
+# 测速任务配置
 test_options:
   # 结果数量下限，低于此值则触发重试
   min_results: 5
@@ -26,31 +30,27 @@ test_options:
   max_retries: 3
   # 上传到 Gist 的最大 IP 数量
   gist_upload_limit: 10
-
-cron: "0 0 * * *" # 每天午夜执行一次
+  # [新增] 重试间隔时间（单位：秒）
+  retry_delay: 5
 
 # CloudflareSpeedTest 配置
 cf:
   binary: "/usr/local/bin/CloudflareSpeedTest"
-  # [修改] 移除 -raw, -json 等不适用参数, 核心是 -o
-  # -o 参数由程序自动添加，无需在此配置
   args:
     - "-dn"
-    - "20" # 下载测速数量
+    - "20"
     - "-t"
-    - "4"  # 延迟测速次数
-  # [修改] 输出文件名更改为 .csv
+    - "4"
   output_file: "result.csv"
 
-# [核心] IPv6 测试配置 (仅在 test_ipv6: true 时启用)
+# IPv6 测试配置
 cf6:
   binary: "/usr/local/bin/CloudflareSpeedTest"
   args:
     - "-dn"
-    - "10" # IPv6 可以测试少一些
+    - "10"
     - "-sl"
     - "20"
-  # IPv6 本地输出的 CSV 文件名
   output_file: "result6.csv"
 
 # 自动更新配置
@@ -58,24 +58,16 @@ update:
   check: true
   api_url: "https://api.github.com/repos/XIU2/CloudflareSpeedTest/releases/latest"
 
-# [新增] 通知配置
+# 通知配置
 notifications:
   enabled: true
   pushplus:
-    token: "" # your_pushplus_token
+    token: ""
   telegram:
-    bot_token: "${TELEGRAM_BOT_TOKEN}" # your_bot_token
-    chat_id: "${TELEGRAM_CHAT_ID}"     # your_chat_id
-    
-    # [核心修改] Telegram 代理配置
+    bot_token: "${TELEGRAM_BOT_TOKEN}"
+    chat_id: "${TELEGRAM_CHAT_ID}"
     proxy:
-      enabled: false # 是否为 Telegram 启用代理
-      # 代理类型: "socks5" 或 "reverse_proxy"
-      type: "socks5" 
-      # SOCKS5 代理地址 (仅当 type 为 "socks5" 时有效)
-      # 例如: "127.0.0.1:1080"
+      enabled: false
+      type: "socks5"
       address: "127.0.0.1:1080"
-      # 反向代理 API 地址 (仅当 type 为 "reverse_proxy" 时有效)
-      # 替换 "https://api.telegram.org"
-      # 例如: "https://my.proxy.com"
       api_url: ""

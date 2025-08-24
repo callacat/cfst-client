@@ -9,7 +9,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
-	"sync" // [新增] 引入 sync 包
+	"sync"
 	"time"
 
 	"cfst-client/pkg/config"
@@ -23,29 +23,27 @@ import (
 
 const configDir = "/app/config"
 
-// [新增] 创建一个全局互斥锁，用于防止任务并发执行
 var runLock sync.Mutex
 
+// [核心修改] 将 configPath 定义为全局变量
+var configPath = filepath.Join(configDir, "config.yml")
+
 func main() {
-	configPath := filepath.Join(configDir, "config.yml")
+	// 立即执行一次测试
+	go runAllTests() // 启动时不再传递 cfg
+
+	// [核心修改] 在启动定时任务前，先加载一次配置以获取 cron 表达式
 	cfg, err := config.Load(configPath)
 	if err != nil {
-		log.Fatal("load config:", err)
+		// 如果第一次加载就失败，很可能是配置文件有严重错误，直接退出
+		log.Fatalf("Failed to load initial config: %v. Please check the config file.", err)
 	}
 
-	if cfg.DeviceName == "" || cfg.LineOperator == "" {
-		log.Fatal("Error: 'device_name' and 'line_operator' in config.yml must not be empty.")
-	}
-
-	// 立即执行一次测试
-	go runAllTests(cfg) // 使用 go 关键字使其在后台运行，避免阻塞后续的定时任务启动
-
-	// 如果配置了 cron 表达式，则启动定时任务
 	if cfg.Cron != "" {
 		log.Printf("Scheduling tests with cron expression: %s", cfg.Cron)
 		c := cron.New()
 		_, err := c.AddFunc(cfg.Cron, func() {
-			runAllTests(cfg)
+			runAllTests() // 定时任务也不再传递 cfg
 		})
 		if err != nil {
 			log.Fatalf("Error adding cron job: %v", err)
@@ -57,18 +55,29 @@ func main() {
 	}
 }
 
-func runAllTests(cfg *config.Config) {
-	// [核心修改] 尝试获取锁
-	// TryLock 是非阻塞的，如果锁已被其他 goroutine 持有，它会立即返回 false
+// [核心修改] runAllTests 函数现在自己负责加载配置
+func runAllTests() {
 	if !runLock.TryLock() {
 		log.Println("A test is already in progress. Skipping this run.")
 		return
 	}
-	// [核心修改] 使用 defer 确保在函数退出时，无论发生什么，都会释放锁
 	defer runLock.Unlock()
 
-	log.Println("--- Starting all tests ---")
+	// [核心修改] 每次运行都重新加载配置文件，实现热重载
+	cfg, err := config.Load(configPath)
+	if err != nil {
+		// 如果热重载失败，记录错误但程序不退出，等待下次调度时再试
+		log.Printf("ERROR: Failed to reload config: %v. Skipping this run.", err)
+		return
+	}
 
+	log.Println("--- Starting all tests with latest configuration ---")
+
+	if cfg.DeviceName == "" || cfg.LineOperator == "" {
+		log.Println("ERROR: 'device_name' and 'line_operator' in config.yml must not be empty. Skipping this run.")
+		return
+	}
+	
 	var notifiers []notifier.Notifier
 	if cfg.Notifications.Enabled {
 		if cfg.Notifications.PushPlus.Token != "" {
@@ -111,8 +120,8 @@ func runAllTests(cfg *config.Config) {
 	log.Println("--- All tests done ---")
 }
 
-// runTest 函数保持不变
 func runTest(gc *gist.Client, cfg *config.Config, version string, notifiers []notifier.Notifier) {
+	// ... (函数前半部分不变) ...
 	var testConfig config.CfConfig
 	var ipFile string
 	var baseGistFilename string
@@ -152,14 +161,16 @@ func runTest(gc *gist.Client, cfg *config.Config, version string, notifiers []no
 		}
 
 		if i < cfg.TestOptions.MaxRetries-1 {
-			log.Printf("Waiting for 5 seconds before next attempt...")
-			time.Sleep(5 * time.Second)
+			// [核心修改] 使用配置文件中的重试延迟
+			delay := time.Duration(cfg.TestOptions.RetryDelay) * time.Second
+			log.Printf("Waiting for %v before next attempt...", delay)
+			time.Sleep(delay)
 		}
 	}
 
+	// ... (函数后半部分不变) ...
 	if len(finalResults) == 0 {
 		log.Printf("FATAL: Speed test for IP%s failed after %d attempts. No results to upload.", version, cfg.TestOptions.MaxRetries)
-		// ... (notification logic remains the same) ...
 		return
 	}
 

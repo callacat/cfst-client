@@ -7,7 +7,7 @@ import (
 	"os"
 )
 
-// ... CfConfig, UpdateConfig, TestOptions 结构体保持不变 ...
+// ... (CfConfig, UpdateConfig 不变) ...
 type CfConfig struct {
 	Binary     string   `yaml:"binary"`
 	Args       []string `yaml:"args"`
@@ -20,12 +20,13 @@ type UpdateConfig struct {
 }
 
 type TestOptions struct {
-	MinResults      int    `yaml:"min_results"`
-	MaxRetries      int    `yaml:"max_retries"`
-	GistUploadLimit int    `yaml:"gist_upload_limit"`
+	MinResults      int `yaml:"min_results"`
+	MaxRetries      int `yaml:"max_retries"`
+	GistUploadLimit int `yaml:"gist_upload_limit"`
+	RetryDelay      int `yaml:"retry_delay"` // [新增]
 }
 
-// [核心修改] 新增 TelegramProxyConfig 结构体
+// ... (TelegramProxyConfig, TelegramConfig, NotificationsConfig 不变) ...
 type TelegramProxyConfig struct {
 	Enabled bool   `yaml:"enabled"`
 	Type    string `yaml:"type"`
@@ -53,13 +54,13 @@ type Config struct {
 	LineOperator string `yaml:"line_operator"`
 	TestIPv6     bool   `yaml:"test_ipv6"`
 	ProxyPrefix  string `yaml:"proxy_prefix"`
-	Cron         string `yaml:"cron"` // 新增 Cron 字段
+	Cron         string `yaml:"cron"`
 
 	Gist struct {
 		Token  string `yaml:"token"`
 		GistID string `yaml:"gist_id"`
 	} `yaml:"gist"`
-	
+
 	Notifications NotificationsConfig `yaml:"notifications"`
 	TestOptions   TestOptions         `yaml:"test_options"`
 	Cf            CfConfig            `yaml:"cf"`
@@ -77,12 +78,17 @@ func Load(path string) (*Config, error) {
 	if err := yaml.Unmarshal(b, &cfg); err != nil {
 		return nil, err
 	}
-	
+
 	// 展开所有需要使用环境变量的字段
 	cfg.ProxyPrefix = os.ExpandEnv(cfg.ProxyPrefix)
 	cfg.Gist.Token = os.ExpandEnv(cfg.Gist.Token)
 	cfg.Notifications.Telegram.BotToken = os.ExpandEnv(cfg.Notifications.Telegram.BotToken)
 	cfg.Notifications.Telegram.ChatID = os.ExpandEnv(cfg.Notifications.Telegram.ChatID)
+
+	// [新增] 为 retry_delay 设置一个默认值，防止配置文件中未设置时程序出错
+	if cfg.TestOptions.RetryDelay <= 0 {
+		cfg.TestOptions.RetryDelay = 5 // 默认为 5 秒
+	}
 
 	return &cfg, nil
 }
