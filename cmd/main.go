@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"sync" // [新增] 引入 sync 包
 	"time"
 
 	"cfst-client/pkg/config"
@@ -22,6 +23,9 @@ import (
 
 const configDir = "/app/config"
 
+// [新增] 创建一个全局互斥锁，用于防止任务并发执行
+var runLock sync.Mutex
+
 func main() {
 	configPath := filepath.Join(configDir, "config.yml")
 	cfg, err := config.Load(configPath)
@@ -34,7 +38,7 @@ func main() {
 	}
 
 	// 立即执行一次测试
-	runAllTests(cfg)
+	go runAllTests(cfg) // 使用 go 关键字使其在后台运行，避免阻塞后续的定时任务启动
 
 	// 如果配置了 cron 表达式，则启动定时任务
 	if cfg.Cron != "" {
@@ -54,8 +58,17 @@ func main() {
 }
 
 func runAllTests(cfg *config.Config) {
+	// [核心修改] 尝试获取锁
+	// TryLock 是非阻塞的，如果锁已被其他 goroutine 持有，它会立即返回 false
+	if !runLock.TryLock() {
+		log.Println("A test is already in progress. Skipping this run.")
+		return
+	}
+	// [核心修改] 使用 defer 确保在函数退出时，无论发生什么，都会释放锁
+	defer runLock.Unlock()
+
 	log.Println("--- Starting all tests ---")
-	
+
 	var notifiers []notifier.Notifier
 	if cfg.Notifications.Enabled {
 		if cfg.Notifications.PushPlus.Token != "" {
@@ -98,8 +111,7 @@ func runAllTests(cfg *config.Config) {
 	log.Println("--- All tests done ---")
 }
 
-// ... (runTest 函数保持不变) ...
-
+// runTest 函数保持不变
 func runTest(gc *gist.Client, cfg *config.Config, version string, notifiers []notifier.Notifier) {
 	var testConfig config.CfConfig
 	var ipFile string
@@ -139,7 +151,6 @@ func runTest(gc *gist.Client, cfg *config.Config, version string, notifiers []no
 			break
 		}
 
-		// 如果不是最后一次尝试，则等待
 		if i < cfg.TestOptions.MaxRetries-1 {
 			log.Printf("Waiting for 5 seconds before next attempt...")
 			time.Sleep(5 * time.Second)
@@ -152,18 +163,14 @@ func runTest(gc *gist.Client, cfg *config.Config, version string, notifiers []no
 		return
 	}
 
-	// [核心修改] 对所有结果进行排序
 	log.Println("Sorting final results...")
 	sort.Slice(finalResults, func(i, j int) bool {
-		// 规则1: 丢包率越低越好
 		if finalResults[i].LossPct != finalResults[j].LossPct {
 			return finalResults[i].LossPct < finalResults[j].LossPct
 		}
-		// 规则2: 延迟越低越好
 		if finalResults[i].LatencyMs != finalResults[j].LatencyMs {
 			return finalResults[i].LatencyMs < finalResults[j].LatencyMs
 		}
-		// 规则3: 下载速度越高越好
 		return finalResults[i].DLMBps > finalResults[j].DLMBps
 	})
 
@@ -182,7 +189,6 @@ func runTest(gc *gist.Client, cfg *config.Config, version string, notifiers []no
 
 	log.Printf("Uploading %d results to Gist as JSON with filename: %s", len(uploadResults), finalGistFilename)
 	if err := gc.PushResults(cfg.Gist.GistID, finalGistFilename, gistContent); err != nil {
-		// ... (error handling remains the same) ...
 		if strings.Contains(err.Error(), "404") {
 			log.Printf("FATAL: Gist update for %s failed with 404 Not Found. Please check Gist ID and GITHUB_TOKEN permissions.", finalGistFilename)
 		}
