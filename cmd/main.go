@@ -159,7 +159,8 @@ func runTest(gc *gist.Client, cfg *config.Config, version string, notifiers []no
 		baseGistFilename = "results"
 	}
 
-	finalGistFilename := fmt.Sprintf("%s-%s.json", baseGistFilename, cfg.LineOperator)
+	// [核心修改] 调整 Gist 文件名格式
+	finalGistFilename := fmt.Sprintf("%s-%s-%s-%s.json", baseGistFilename, cfg.LineOperator, cfg.DeviceName, version)
 	finalArgs := append(testConfig.Args, "-f", ipFile)
 	localCsvPath := filepath.Join(configDir, testConfig.OutputFile)
 
