@@ -8,23 +8,23 @@ on:
     branches:
       - main
 
+# .github/workflows/docker-publish.yml - 修正后的版本
+
 jobs:
-  # ====================================================================
-  # Job 1: 决定是否需要发布新版本
-  # ====================================================================
   release:
     name: Create Release
     runs-on: ubuntu-latest
     outputs:
-      new_release_published: ${{ steps.release.outputs.new_release_published }}
-      new_release_version: ${{ steps.release.outputs.new_release_version }}
-      new_release_tag: ${{ steps.release.outputs.new_release_tag }}
+      # [修正] 将输出变量名与 release-please-action 的实际输出对齐
+      new_release_published: ${{ steps.release.outputs.release_created }}
+      new_release_version: ${{ steps.release.outputs.version }}
+      new_release_tag: ${{ steps.release.outputs.tag_name }}
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          # 需要获取所有历史记录和标签以供版本控制操作使用
+          # We need to fetch all history and tags for the versioning action
           fetch-depth: 0
 
       - name: Automatic Versioning and Release Creation
@@ -34,14 +34,12 @@ jobs:
           release-type: go
           package-name: cfst-client
 
-  # ====================================================================
-  # Job 2: 如果发布了新版本，则构建所有产物并推送 Docker 镜像
-  # ====================================================================
+  # build-and-publish 作业无需任何改动
   build-and-publish:
-    name: Build Binaries and Push Docker on Release
+    name: Build Binaries and Push Docker
     needs: release
-    # 仅在新版本实际创建时运行此作业
     if: needs.release.outputs.new_release_published == 'true'
+    # ... 后续步骤保持不变 ...
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
