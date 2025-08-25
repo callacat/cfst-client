@@ -1,5 +1,4 @@
 # .github/workflows/docker-publish.yml
-# 该工作流仅在检测到 feat: 或 fix: 提交并创建新版本时运行。
 
 name: Automatic Versioning and Release
 
@@ -8,14 +7,17 @@ on:
     branches:
       - main
 
-# .github/workflows/docker-publish.yml - 修正后的版本
+# [核心修正 1] 为工作流授予创建 PR 和 Release 的权限
+permissions:
+  contents: write
+  pull-requests: write
 
 jobs:
   release:
     name: Create Release
     runs-on: ubuntu-latest
     outputs:
-      # [修正] 将输出变量名与 release-please-action 的实际输出对齐
+      # [核心修正 2] 确保使用正确的输出变量名
       new_release_published: ${{ steps.release.outputs.release_created }}
       new_release_version: ${{ steps.release.outputs.version }}
       new_release_tag: ${{ steps.release.outputs.tag_name }}
@@ -24,7 +26,6 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          # We need to fetch all history and tags for the versioning action
           fetch-depth: 0
 
       - name: Automatic Versioning and Release Creation
@@ -34,14 +35,14 @@ jobs:
           release-type: go
           package-name: cfst-client
 
-  # build-and-publish 作业无需任何改动
   build-and-publish:
-    name: Build Binaries and Push Docker
+    name: Build Binaries and Push Docker on Release
     needs: release
+    # 仅在新版本实际创建时运行此作业
     if: needs.release.outputs.new_release_published == 'true'
-    # ... 后续步骤保持不变 ...
     runs-on: ubuntu-latest
     steps:
+      # ... 后续的构建步骤保持不变 ...
       - name: Checkout code
         uses: actions/checkout@v4
 
@@ -50,7 +51,7 @@ jobs:
         with:
           go-version: '1.25'
 
-      - name: Set up QEMU for multi-arch build
+      - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
 
       - name: Set up Docker Buildx
@@ -62,24 +63,22 @@ jobs:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Build binaries for all platforms
+      - name: Build binaries for release
         run: |
           echo "Building binaries for release version ${{ needs.release.outputs.new_release_version }}..."
           mkdir -p release_assets
-          # Linux builds
           CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o release_assets/cfst-client-linux-amd64 ./cmd/main.go
           CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -o release_assets/cfst-client-linux-arm64 ./cmd/main.go
-          # Windows builds (x64 and x86)
           CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -o release_assets/cfst-client-windows-amd64.exe ./cmd/main.go
           CGO_ENABLED=0 GOOS=windows GOARCH=386 go build -o release_assets/cfst-client-windows-386.exe ./cmd/main.go
 
-      - name: Upload All Binaries to Release
+      - name: Upload Binaries to Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ needs.release.outputs.new_release_tag }}
           files: release_assets/*
 
-      - name: Build and push versioned Docker image
+      - name: Build and push Docker image
         run: |
           VERSION_TAG=${{ needs.release.outputs.new_release_version }}
           docker buildx build \
