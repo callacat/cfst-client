@@ -36,6 +36,16 @@ jobs:
           release-type: go
           package-name: cfst-client
 
+      # [新增] 自动合并由 Release Please 创建的 PR
+      - name: Auto-merge the release PR
+        if: ${{ steps.release.outputs.pull_request_number }}
+        uses: pascalgn/automerge-action@v0.15.6
+        env:
+          GITHUB_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
+          MERGE_LABELS: ""
+          MERGE_METHOD: "squash"
+          PULL_REQUEST: "${{ steps.release.outputs.pull_request_number }}"
+
       - name: Delete workflow runs
         uses: Mattraks/delete-workflow-runs@v2
         with:
