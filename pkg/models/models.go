@@ -9,7 +9,7 @@ type GistContent struct {
 // DeviceResult 代表单条测速结果
 // [修改] 新增了 Region 字段
 type DeviceResult struct {
-	Device    string  `json:"-"`
+	Device    string  `json:"device"`
 	Operator  string  `json:"operator"`
 	IP        string  `json:"ip"`
 	LatencyMs int     `json:"latency_ms"`
