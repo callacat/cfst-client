@@ -1,17 +1,15 @@
 # config.yml
 
-# [新增] Cron 表达式，用于定时执行测速任务
-# 留空表示只在启动时执行一次
-cron: "0 0 * * *" # 例如 "0 0 * * *" 表示每天午夜执行一次
+# Cron 表达式，用于定时执行测速任务
+cron: "0 0 * * *"
 
 # 当前测试端设备的唯一名称
 device_name: "my-first-client"
 
-# [核心] 当前设备所属的线路运营商 (ct, cu, cm)
-# 这个值将被用于生成上传到 Gist 的文件名
-line_operator: "cu" # 例如 "cu" 代表联通
+# 当前设备所属的线路运营商 (ct, cu, cm)
+line_operator: "cu"
 
-# [核心] 是否启用 IPv6 测试 (true / false)
+# 是否启用 IPv6 测试 (true / false)
 test_ipv6: true
 
 # 全局 GitHub 前置代理前缀
@@ -24,14 +22,20 @@ gist:
 
 # 测速任务配置
 test_options:
-  # 结果数量下限，低于此值则触发重试
+  # 即时重试：结果数量下限，低于此值则触发重试
   min_results: 5
-  # 最大重试次数
+  # 即时重试：最大重试次数
   max_retries: 3
+  # 即时重试：重试间隔时间（单位：秒）
+  retry_delay: 5
+
+  # [新功能] 延迟重试：当以上即时重试全部失败后，启用此机制
+  delayed_retry:
+    enabled: true       # 是否启用
+    delay_minutes: 30   # 失败后多少分钟后再次尝试
+
   # 上传到 Gist 的最大 IP 数量
   gist_upload_limit: 10
-  # [新增] 重试间隔时间（单位：秒）
-  retry_delay: 5
 
 # CloudflareSpeedTest 配置
 cf:

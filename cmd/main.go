@@ -23,39 +23,38 @@ import (
 
 const configDir = "/app/config"
 
-var runLock sync.Mutex
+var (
+	runLock    sync.Mutex
+	configPath = filepath.Join(configDir, "config.yml")
+)
 
-// [核心修改] 将 configPath 定义为全局变量
-var configPath = filepath.Join(configDir, "config.yml")
+// [新增] 全局变量，以便延迟任务可以访问它们
+var (
+	globalGistClient *gist.Client
+	globalNotifiers  []notifier.Notifier
+)
 
 func main() {
 	// 立即执行一次测试
-	go runAllTests() // 启动时不再传递 cfg
+	go runAllTests()
 
-	// [核心修改] 在启动定时任务前，先加载一次配置以获取 cron 表达式
 	cfg, err := config.Load(configPath)
 	if err != nil {
-		// 如果第一次加载就失败，很可能是配置文件有严重错误，直接退出
 		log.Fatalf("Failed to load initial config: %v. Please check the config file.", err)
 	}
 
 	if cfg.Cron != "" {
 		log.Printf("Scheduling tests with cron expression: %s", cfg.Cron)
 		c := cron.New()
-		_, err := c.AddFunc(cfg.Cron, func() {
-			runAllTests() // 定时任务也不再传递 cfg
-		})
+		_, err := c.AddFunc(cfg.Cron, runAllTests)
 		if err != nil {
 			log.Fatalf("Error adding cron job: %v", err)
 		}
 		c.Start()
-
-		// 保持主 goroutine 运行
 		select {}
 	}
 }
 
-// [核心修改] runAllTests 函数现在自己负责加载配置
 func runAllTests() {
 	if !runLock.TryLock() {
 		log.Println("A test is already in progress. Skipping this run.")
@@ -63,10 +62,8 @@ func runAllTests() {
 	}
 	defer runLock.Unlock()
 
-	// [核心修改] 每次运行都重新加载配置文件，实现热重载
 	cfg, err := config.Load(configPath)
 	if err != nil {
-		// 如果热重载失败，记录错误但程序不退出，等待下次调度时再试
 		log.Printf("ERROR: Failed to reload config: %v. Skipping this run.", err)
 		return
 	}
@@ -77,18 +74,19 @@ func runAllTests() {
 		log.Println("ERROR: 'device_name' and 'line_operator' in config.yml must not be empty. Skipping this run.")
 		return
 	}
-	
-	var notifiers []notifier.Notifier
+
+	// [修改] 初始化全局通知器列表
+	globalNotifiers = nil
 	if cfg.Notifications.Enabled {
 		if cfg.Notifications.PushPlus.Token != "" {
-			notifiers = append(notifiers, &notifier.PushPlusNotifier{Token: cfg.Notifications.PushPlus.Token})
+			globalNotifiers = append(globalNotifiers, &notifier.PushPlusNotifier{Token: cfg.Notifications.PushPlus.Token})
 		}
 		if cfg.Notifications.Telegram.BotToken != "" && cfg.Notifications.Telegram.ChatID != "" {
 			tgNotifier, err := notifier.NewTelegramNotifier(cfg.Notifications.Telegram)
 			if err != nil {
 				log.Printf("WARN: Failed to initialize Telegram notifier: %v", err)
 			} else {
-				notifiers = append(notifiers, tgNotifier)
+				globalNotifiers = append(globalNotifiers, tgNotifier)
 			}
 		}
 	}
@@ -105,14 +103,15 @@ func runAllTests() {
 		log.Println("CloudflareSpeedTest update check is disabled in config.yml.")
 	}
 
-	gc := gist.NewClient(os.ExpandEnv(cfg.Gist.Token), cfg.ProxyPrefix)
+	// [修改] 初始化全局 Gist 客户端
+	globalGistClient = gist.NewClient(os.ExpandEnv(cfg.Gist.Token), cfg.ProxyPrefix)
 
 	log.Println("--- Starting test for IPv4 ---")
-	runTest(gc, cfg, "v4", notifiers)
+	runTest(globalGistClient, cfg, "v4", globalNotifiers)
 
 	if cfg.TestIPv6 {
 		log.Println("--- Starting test for IPv6 ---")
-		runTest(gc, cfg, "v6", notifiers)
+		runTest(globalGistClient, cfg, "v6", globalNotifiers)
 	} else {
 		log.Println("IPv6 test is disabled in config.yml, skipping.")
 	}
@@ -120,8 +119,32 @@ func runAllTests() {
 	log.Println("--- All tests done ---")
 }
 
+// [新增] 用于执行延迟重试的函数
+func scheduleDelayedRetry(version string) {
+	// 重新加载最新的配置，以防用户在等待期间修改了配置
+	cfg, err := config.Load(configPath)
+	if err != nil {
+		log.Printf("DELAYED RETRY [IP%s]: ERROR: Failed to reload config: %v. Aborting delayed retry.", version, err)
+		return
+	}
+
+	delay := time.Duration(cfg.TestOptions.DelayedRetry.DelayMinutes) * time.Minute
+	log.Printf("DELAYED RETRY [IP%s]: Test failed. Scheduling a delayed retry in %v.", version, delay)
+
+	time.AfterFunc(delay, func() {
+		log.Printf("DELAYED RETRY [IP%s]: Starting delayed retry now.", version)
+		if !runLock.TryLock() {
+			log.Printf("DELAYED RETRY [IP%s]: Another test is already in progress. Skipping delayed retry.", version)
+			return
+		}
+		defer runLock.Unlock()
+
+		// 使用最新的配置和全局客户端/通知器执行单次测试
+		runTest(globalGistClient, cfg, version, globalNotifiers)
+	})
+}
+
 func runTest(gc *gist.Client, cfg *config.Config, version string, notifiers []notifier.Notifier) {
-	// ... (函数前半部分不变) ...
 	var testConfig config.CfConfig
 	var ipFile string
 	var baseGistFilename string
@@ -136,14 +159,13 @@ func runTest(gc *gist.Client, cfg *config.Config, version string, notifiers []no
 		baseGistFilename = "results"
 	}
 
-	finalGistFilename := fmt.Sprintf("%s-%s-%s-%s.json", baseGistFilename, cfg.LineOperator, cfg.DeviceName, version)
+	finalGistFilename := fmt.Sprintf("%s-%s.json", baseGistFilename, cfg.LineOperator)
 	finalArgs := append(testConfig.Args, "-f", ipFile)
 	localCsvPath := filepath.Join(configDir, testConfig.OutputFile)
 
 	cf := tester.NewCFSpeedTester(testConfig.Binary, localCsvPath, cfg.DeviceName, cfg.LineOperator, finalArgs)
 
 	var finalResults []models.DeviceResult
-
 	for i := 0; i < cfg.TestOptions.MaxRetries; i++ {
 		log.Printf("--- Starting speed test for IP%s (Attempt %d/%d) ---", version, i+1, cfg.TestOptions.MaxRetries)
 		currentResults, err := cf.Run()
@@ -161,17 +183,20 @@ func runTest(gc *gist.Client, cfg *config.Config, version string, notifiers []no
 		}
 
 		if i < cfg.TestOptions.MaxRetries-1 {
-			// [核心修改] 使用配置文件中的重试延迟
 			delay := time.Duration(cfg.TestOptions.RetryDelay) * time.Second
 			log.Printf("Waiting for %v before next attempt...", delay)
 			time.Sleep(delay)
 		}
 	}
 
-	// ... (函数后半部分不变) ...
 	if len(finalResults) == 0 {
-		log.Printf("FATAL: Speed test for IP%s failed after %d attempts. No results to upload.", version, cfg.TestOptions.MaxRetries)
-		return
+		log.Printf("FATAL: Speed test for IP%s failed after %d immediate attempts.", version, cfg.TestOptions.MaxRetries)
+		// [新增] 检查是否启用延迟重试
+		if cfg.TestOptions.DelayedRetry.Enabled && cfg.TestOptions.DelayedRetry.DelayMinutes > 0 {
+			// 在一个新的 goroutine 中安排延迟重试，不会阻塞后续代码
+			go scheduleDelayedRetry(version)
+		}
+		return // 结束当前测试流程
 	}
 
 	log.Println("Sorting final results...")
@@ -202,8 +227,9 @@ func runTest(gc *gist.Client, cfg *config.Config, version string, notifiers []no
 	if err := gc.PushResults(cfg.Gist.GistID, finalGistFilename, gistContent); err != nil {
 		if strings.Contains(err.Error(), "404") {
 			log.Printf("FATAL: Gist update for %s failed with 404 Not Found. Please check Gist ID and GITHUB_TOKEN permissions.", finalGistFilename)
+		} else {
+			log.Printf("Gist update for %s failed: %v", finalGistFilename, err)
 		}
-		log.Printf("Gist update for %s failed: %v", finalGistFilename, err)
 		return
 	}
 

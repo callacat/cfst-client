@@ -7,7 +7,8 @@ import (
 	"os"
 )
 
-// ... (CfConfig, UpdateConfig 不变) ...
+// ... (其他结构体不变) ...
+
 type CfConfig struct {
 	Binary     string   `yaml:"binary"`
 	Args       []string `yaml:"args"`
@@ -19,14 +20,22 @@ type UpdateConfig struct {
 	ApiURL string `yaml:"api_url"`
 }
 
+// [新增] 延迟重试的配置结构体
+type DelayedRetryConfig struct {
+	Enabled      bool `yaml:"enabled"`
+	DelayMinutes int  `yaml:"delay_minutes"`
+}
+
 type TestOptions struct {
 	MinResults      int `yaml:"min_results"`
 	MaxRetries      int `yaml:"max_retries"`
 	GistUploadLimit int `yaml:"gist_upload_limit"`
-	RetryDelay      int `yaml:"retry_delay"` // [新增]
+	RetryDelay      int `yaml:"retry_delay"` 
+	// [新增] 嵌入延迟重试的配置
+	DelayedRetry    DelayedRetryConfig `yaml:"delayed_retry"`
 }
 
-// ... (TelegramProxyConfig, TelegramConfig, NotificationsConfig 不变) ...
+// ... (其他结构体不变) ...
 type TelegramProxyConfig struct {
 	Enabled bool   `yaml:"enabled"`
 	Type    string `yaml:"type"`
@@ -85,7 +94,6 @@ func Load(path string) (*Config, error) {
 	cfg.Notifications.Telegram.BotToken = os.ExpandEnv(cfg.Notifications.Telegram.BotToken)
 	cfg.Notifications.Telegram.ChatID = os.ExpandEnv(cfg.Notifications.Telegram.ChatID)
 
-	// [新增] 为 retry_delay 设置一个默认值，防止配置文件中未设置时程序出错
 	if cfg.TestOptions.RetryDelay <= 0 {
 		cfg.TestOptions.RetryDelay = 5 // 默认为 5 秒
 	}
