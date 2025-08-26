@@ -1,7 +1,3 @@
-好的，这是为您当前项目生成的 README.md 文件。
-
------
-
 # cfst-client
 
 `cfst-client` 是一个自动化的 Cloudflare 速度测试客户端，旨在定期运行速度测试并将结果聚合上传到指定的 GitHub Gist。它被打包为一个易于部署的 Docker 容器，并支持丰富的自定义配置。
