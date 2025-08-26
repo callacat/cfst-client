@@ -7,7 +7,7 @@ on:
     branches:
       - main
 
-# [核心修正 1] 为工作流授予创建 PR 和 Release 的权限
+# [CORE FIX 1] Grant permissions for creating PRs and Releases
 permissions:
   contents: write
   pull-requests: write
@@ -18,7 +18,7 @@ jobs:
     name: Create Release
     runs-on: ubuntu-latest
     outputs:
-      # [核心修正 2] 确保使用正确的输出变量名
+      # [CORE FIX 2] Ensure the correct output variable name is used
       new_release_published: ${{ steps.release.outputs.release_created }}
       new_release_version: ${{ steps.release.outputs.version }}
       new_release_tag: ${{ steps.release.outputs.tag_name }}
@@ -31,12 +31,13 @@ jobs:
 
       - name: Automatic Versioning and Release Creation
         id: release
-        uses: google-github-actions/release-please-action@v4
+        # [FIX] Use the new, non-deprecated action name
+        uses: googleapis/release-please-action@v4
         with:
           release-type: go
-          package-name: cfst-client
+          # [FIX] Removed the unsupported 'package-name' input
 
-      # [新增] 自动合并由 Release Please 创建的 PR
+      # [NEW] Auto-merge the release PR created by Release Please
       - name: Auto-merge the release PR
         if: ${{ steps.release.outputs.pull_request_number }}
         uses: pascalgn/automerge-action@v0.15.6
@@ -55,11 +56,11 @@ jobs:
   build-and-publish:
     name: Build Binaries and Push Docker on Release
     needs: release
-    # 仅在新版本实际创建时运行此作业
+    # Only run this job if a new release was actually created
     if: needs.release.outputs.new_release_published == 'true'
     runs-on: ubuntu-latest
     steps:
-      # ... 后续的构建步骤保持不变 ...
+      # ... Subsequent build steps remain the same ...
       - name: Checkout code
         uses: actions/checkout@v4
 
